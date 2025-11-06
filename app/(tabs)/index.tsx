@@ -1,98 +1,138 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type Transaction = {
+  id: string;
+  title: string;
+  category: string;
+  amount: number;
+  type: 'income' | 'expense';
+};
 
-export default function HomeScreen() {
+export default function TransaksiScreen() {
+  const data: Transaction[] = [
+    { id: '1', title: 'Gaji Bulanan', category: 'Gaji Bulanan', amount: 10000000, type: 'income' },
+    { id: '2', title: 'Makanan dan Minuman', category: 'Makanan', amount: 2600000, type: 'expense' },
+  ];
+
+  const totalIncome = data.filter(d => d.type === 'income').reduce((a, b) => a + b.amount, 0);
+  const totalExpense = data.filter(d => d.type === 'expense').reduce((a, b) => a + b.amount, 0);
+  const difference = totalIncome - totalExpense;
+
+  const renderItem = ({ item }: { item: Transaction }) => (
+    <View style={styles.item}>
+      <View>
+        <Text style={styles.itemTitle}>{item.title}</Text>
+        <Text style={styles.itemCategory}>{item.category}</Text>
+      </View>
+      <Text
+        style={[
+          styles.itemAmount,
+          { color: item.type === 'income' ? '#FFB84C' : '#D83A56' },
+        ]}
+      >
+        {item.type === 'income'
+          ? `+ ${item.amount.toLocaleString('id-ID')}`
+          : `- ${item.amount.toLocaleString('id-ID')}`}
+      </Text>
+    </View>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      {/* Header hijau */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Transaksi</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryTitle}>Pemasukan</Text>
+            <Text style={[styles.summaryAmount, { color: '#FFB84C' }]}>
+              + {totalIncome.toLocaleString('id-ID')}
+            </Text>
+          </View>
+
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryTitle}>Pengeluaran</Text>
+            <Text style={[styles.summaryAmount, { color: '#D83A56' }]}>
+              - {totalExpense.toLocaleString('id-ID')}
+            </Text>
+          </View>
+
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryTitle}>Selisih</Text>
+            <Text style={[styles.summaryAmount, { color: '#7A9D54' }]}>
+              {difference.toLocaleString('id-ID')}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Daftar transaksi */}
+      <FlatList
+        data={data}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContent}
+      />
+
+      {/* Tombol tambah */}
+      <TouchableOpacity style={styles.addButton}>
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: { flex: 1, backgroundColor: '#fff' },
+  header: {
+    backgroundColor: '#00A86B',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  summaryContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 10,
+    justifyContent: 'space-between',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  summaryBox: { alignItems: 'center', flex: 1 },
+  summaryTitle: { fontWeight: '600', color: '#000' },
+  summaryAmount: { fontWeight: 'bold', marginTop: 4 },
+  listContent: { paddingHorizontal: 16, paddingTop: 20 },
+  item: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 0.6,
+    borderColor: '#E5E5E5',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  itemTitle: { fontSize: 16, fontWeight: 'bold' },
+  itemCategory: { fontSize: 12, color: '#555' },
+  itemAmount: { fontSize: 16, fontWeight: '600' },
+  addButton: {
+    backgroundColor: '#00A86B',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     position: 'absolute',
+    bottom: 25,
+    right: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
   },
 });
