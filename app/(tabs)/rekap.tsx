@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
-import { Ionicons } from '@expo/vector-icons';
 
 export default function RekapScreen() {
   const screenWidth = Dimensions.get('window').width;
@@ -90,11 +89,6 @@ export default function RekapScreen() {
           </View>
         ))}
       </ScrollView>
-
-      {/* Tombol + */}
-      <TouchableOpacity style={styles.fab}>
-        <Ionicons name="add" size={30} color="#fff" />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -142,16 +136,4 @@ const styles = StyleSheet.create({
   },
   category: { flex: 1, fontSize: 15 },
   amount: { fontSize: 15, color: '#000' },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 30,
-    backgroundColor: '#00A86B',
-    width: 55,
-    height: 55,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-  },
 });
