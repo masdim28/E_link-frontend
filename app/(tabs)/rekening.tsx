@@ -1,85 +1,128 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Animated,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+type Rekening = {
+  id: string;
+  bank: string;
+  saldo: number;
+};
 
 export default function RekeningScreen() {
   const [showOptions, setShowOptions] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
-
-  const data = [
-    { nama: 'Total', saldo: 10000000 },
-    { nama: 'CBA', saldo: 10000000 },
-    { nama: 'RBI', saldo: 0 },
-    { nama: 'Anad', saldo: 0 },
-    { nama: 'Paygo', saldo: 0 },
-    { nama: 'Goja', saldo: 0 },
-  ];
+  const router = useRouter();
 
   const toggleOptions = () => {
     if (showOptions) {
-      Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        setShowOptions(false);
-      });
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => setShowOptions(false));
     } else {
       setShowOptions(true);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     }
   };
 
+  const data: Rekening[] = [
+    { id: '1', bank: 'BCA', saldo: 8000000 },
+    { id: '2', bank: 'BRI', saldo: 2500000 },
+  ];
+
+  const totalSaldo = data.reduce((a, b) => a + b.saldo, 0);
+
+  const renderItem = ({ item }: { item: Rekening }) => (
+    <View style={styles.item}>
+      <Text style={styles.itemBank}>{item.bank}</Text>
+      <Text style={styles.itemSaldo}>
+        Rp {item.saldo.toLocaleString('id-ID')}
+      </Text>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
-      {/* Header Hijau */}
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerText}>Rekening</Text>
+        <Text style={styles.headerTitle}>Rekening</Text>
+
+        <View style={styles.summaryContainer}>
+          <Text style={styles.summaryTitle}>Total Saldo</Text>
+          <Text style={styles.summaryAmount}>
+            Rp {totalSaldo.toLocaleString('id-ID')}
+          </Text>
+        </View>
       </View>
 
-      {/* Daftar Rekening */}
-      <ScrollView style={styles.listContainer}>
-        {data.map((item, index) => (
-          <View key={index} style={styles.row}>
-            <Text style={[styles.cell, styles.left]}>{item.nama}</Text>
-            <Text style={[styles.cell, styles.right]}>
-              {item.saldo.toLocaleString('id-ID')}
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
+      {/* Daftar rekening */}
+      <FlatList
+        data={data}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContent}
+      />
 
-      {/* Overlay Gelap */}
+      {/* Overlay untuk menutup opsi */}
       {showOptions && (
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-          <TouchableOpacity style={styles.overlayTouch} onPress={toggleOptions} />
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={toggleOptions}
+          />
         </Animated.View>
       )}
 
-      {/* Tombol Tambah + Opsi */}
+      {/* Tombol tambah + opsi */}
       <View style={styles.fabContainer}>
         {showOptions && (
-          <Animated.View style={[styles.optionContainer, { opacity: fadeAnim }]}>
-            {/* Tombol Pemasukan */}
+          <Animated.View
+            style={[styles.optionContainer, { opacity: fadeAnim }]}
+          >
+            {/* Pemasukan */}
             <View style={styles.optionRow}>
-              <TouchableOpacity style={styles.optionLabel}>
+              <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pemasukan</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.optionIcon, { backgroundColor: '#00A86B' }]}>
+              </View>
+              <TouchableOpacity
+                style={[styles.optionIcon, { backgroundColor: '#00A86B' }]}
+                onPress={() => router.push('/tambah-pemasukan')}
+              >
                 <Ionicons name="card-outline" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
 
-            {/* Tombol Pengeluaran */}
+            {/* Pengeluaran */}
             <View style={styles.optionRow}>
-              <TouchableOpacity style={styles.optionLabel}>
+              <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pengeluaran</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.optionIcon, { backgroundColor: '#D83A56' }]}>
+              </View>
+              <TouchableOpacity
+                style={[styles.optionIcon, { backgroundColor: '#D83A56' }]}
+                onPress={() => router.push('/tambah-pengeluaran')}
+              >
                 <Ionicons name="bag-handle-outline" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           </Animated.View>
         )}
 
-        <TouchableOpacity style={styles.fab} onPress={toggleOptions}>
-          <Ionicons name={showOptions ? 'close' : 'add'} size={30} color="#fff" />
+        <TouchableOpacity style={styles.addButton} onPress={toggleOptions}>
+          <Ionicons name={showOptions ? 'close' : 'add'} size={28} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -90,34 +133,53 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
     backgroundColor: '#00A86B',
-    paddingVertical: 14,
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  summaryContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  headerText: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  listContainer: { paddingVertical: 10 },
-  row: {
+  summaryTitle: { fontWeight: '600', color: '#000' },
+  summaryAmount: { fontWeight: 'bold', fontSize: 16, color: '#00A86B' },
+  listContent: { paddingHorizontal: 16, paddingTop: 20 },
+  item: {
     flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#ccc',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 0.6,
+    borderColor: '#E5E5E5',
   },
-  cell: { fontSize: 16 },
-  left: { flex: 1, color: '#000' },
-  right: { color: '#000', textAlign: 'right', width: 100 },
+  itemBank: { fontSize: 16, fontWeight: 'bold' },
+  itemSaldo: { fontSize: 16, fontWeight: '600', color: '#00A86B' },
 
-  fabContainer: { position: 'absolute', right: 20, bottom: 30, alignItems: 'center' },
-  fab: {
+  fabContainer: {
+    position: 'absolute',
+    bottom: 25,
+    right: 25,
+    alignItems: 'center',
+  },
+  addButton: {
     backgroundColor: '#00A86B',
     width: 55,
     height: 55,
     borderRadius: 30,
-    justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
+    justifyContent: 'center',
+    elevation: 4,
   },
-
-  // === Gaya baru untuk tombol Pemasukan & Pengeluaran ===
   optionContainer: {
     alignItems: 'flex-end',
     marginBottom: 10,
@@ -147,10 +209,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  overlayTouch: { flex: 1 },
 });

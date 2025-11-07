@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Animated,
@@ -20,6 +21,7 @@ type Transaction = {
 export default function TransaksiScreen() {
   const [showOptions, setShowOptions] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
+  const router = useRouter();
 
   const toggleOptions = () => {
     if (showOptions) {
@@ -136,22 +138,24 @@ export default function TransaksiScreen() {
         {showOptions && (
           <Animated.View style={[styles.optionContainer, { opacity: fadeAnim }]}>
             <View style={styles.optionRow}>
-              <TouchableOpacity style={styles.optionLabel}>
+              <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pemasukan</Text>
-              </TouchableOpacity>
+              </View>
               <TouchableOpacity
                 style={[styles.optionIcon, { backgroundColor: '#00A86B' }]}
+                onPress={() => router.push('/tambah-pemasukan')}
               >
                 <Ionicons name="card-outline" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
 
             <View style={styles.optionRow}>
-              <TouchableOpacity style={styles.optionLabel}>
+              <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pengeluaran</Text>
-              </TouchableOpacity>
+              </View>
               <TouchableOpacity
                 style={[styles.optionIcon, { backgroundColor: '#D83A56' }]}
+                onPress={() => router.push('/tambah-pengeluaran')}
               >
                 <Ionicons name="bag-handle-outline" size={20} color="#fff" />
               </TouchableOpacity>
@@ -206,7 +210,6 @@ const styles = StyleSheet.create({
   itemCategory: { fontSize: 12, color: '#555' },
   itemAmount: { fontSize: 16, fontWeight: '600' },
 
-  // Tombol tambah + opsi
   fabContainer: {
     position: 'absolute',
     bottom: 25,
