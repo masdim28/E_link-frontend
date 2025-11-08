@@ -1,34 +1,26 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function SettingScreen() {
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await AsyncStorage.removeItem('user');
-    router.replace('/login');
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Pengaturan</Text>
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+      {/* Di sini nanti bisa ditambahkan opsi setting lain */}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 30 },
-  logoutButton: {
-    backgroundColor: '#D83A56',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 8,
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff', // biar tampilannya tetap putih
   },
-  logoutText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 30,
+    color: '#000',
+  },
 });

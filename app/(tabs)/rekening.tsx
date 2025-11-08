@@ -2,12 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Animated,
-  FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
+  FlatList,
+  TouchableOpacity,
 } from 'react-native';
 
 type Rekening = {
@@ -17,26 +16,8 @@ type Rekening = {
 };
 
 export default function RekeningScreen() {
-  const [showOptions, setShowOptions] = useState(false);
-  const fadeAnim = useState(new Animated.Value(0))[0];
+  // router tetap ada jika nanti diperlukan
   const router = useRouter();
-
-  const toggleOptions = () => {
-    if (showOptions) {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => setShowOptions(false));
-    } else {
-      setShowOptions(true);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
 
   const data: Rekening[] = [
     { id: '1', bank: 'BCA', saldo: 8000000 },
@@ -76,53 +57,10 @@ export default function RekeningScreen() {
         contentContainerStyle={styles.listContent}
       />
 
-      {/* Overlay untuk menutup opsi */}
-      {showOptions && (
-        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={toggleOptions}
-          />
-        </Animated.View>
-      )}
-
-      {/* Tombol tambah + opsi */}
+      {/* Tombol tambah (tidak berfungsi) */}
       <View style={styles.fabContainer}>
-        {showOptions && (
-          <Animated.View
-            style={[styles.optionContainer, { opacity: fadeAnim }]}
-          >
-            {/* Pemasukan */}
-            <View style={styles.optionRow}>
-              <View style={styles.optionLabel}>
-                <Text style={styles.optionLabelText}>Pemasukan</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.optionIcon, { backgroundColor: '#00A86B' }]}
-                onPress={() => router.push('/tambah-pemasukan')}
-              >
-                <Ionicons name="card-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Pengeluaran */}
-            <View style={styles.optionRow}>
-              <View style={styles.optionLabel}>
-                <Text style={styles.optionLabelText}>Pengeluaran</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.optionIcon, { backgroundColor: '#D83A56' }]}
-                onPress={() => router.push('/tambah-pengeluaran')}
-              >
-                <Ionicons name="bag-handle-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
-
-        <TouchableOpacity style={styles.addButton} onPress={toggleOptions}>
-          <Ionicons name={showOptions ? 'close' : 'add'} size={28} color="#fff" />
+        <TouchableOpacity style={styles.addButton} activeOpacity={0.7}>
+          <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -179,38 +117,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
-  },
-  optionContainer: {
-    alignItems: 'flex-end',
-    marginBottom: 10,
-    gap: 12,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  optionLabel: {
-    backgroundColor: '#f2f2f2',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  optionLabelText: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  optionIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
 });

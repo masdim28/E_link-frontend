@@ -3,14 +3,15 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Keyboard,
 } from 'react-native';
 
 export default function TambahPengeluaran() {
@@ -21,11 +22,29 @@ export default function TambahPengeluaran() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [jumlah, setJumlah] = useState('');
+  const [kategoriDipilih, setKategoriDipilih] = useState('');
   const [modalVisible, setModalVisible] = useState(true);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [kategoriBaru, setKategoriBaru] = useState('');
+  const [kategoriList, setKategoriList] = useState([
+    'Makanan',
+    'Kos',
+    'Kesehatan',
+    'Transportasi',
+    'Jajan',
+    'Buah',
+  ]);
 
   const daftarRekening = [
-    'Gopay', 'Dana', 'Mandiri', 'BCA', 'Jago', 'OVO', 'BRI', 'Lainnya', 'Uang Tunai',
+    'Gopay',
+    'Dana',
+    'Mandiri',
+    'BCA',
+    'Jago',
+    'OVO',
+    'BRI',
+    'Lainnya',
+    'Uang Tunai',
   ];
 
   const handleDateChange = (_: any, selectedDate?: Date) => {
@@ -48,6 +67,55 @@ export default function TambahPengeluaran() {
   const pilihDariDropdown = (item: string) => {
     setRekeningDipilih(item);
     setDropdownVisible(false);
+  };
+
+  const pilihKategori = (item: string) => {
+    setKategoriDipilih(item);
+  };
+
+  const handleTambahKategori = () => {
+    const nama = kategoriBaru.trim();
+    if (nama !== '' && !kategoriList.includes(nama)) {
+      setKategoriList([...kategoriList, nama]);
+      setKategoriDipilih(nama);
+      setKategoriBaru('');
+      Keyboard.dismiss();
+    }
+  };
+
+  const handleSubmitEditing = () => {
+    handleTambahKategori();
+  };
+
+  const formatTanggalIndonesia = (date: Date) => {
+    const hariList = [
+      'Minggu',
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+    ];
+    const bulanList = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    const hari = hariList[date.getDay()];
+    const tanggal = date.getDate();
+    const bulan = bulanList[date.getMonth()];
+    const tahun = date.getFullYear();
+    return `${hari}, ${tanggal} ${bulan} ${tahun}`;
   };
 
   return (
@@ -78,7 +146,7 @@ export default function TambahPengeluaran() {
           onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tambah Transaksi</Text>
+        <Text style={styles.headerTitle}>Tambah Pengeluaran</Text>
       </View>
 
       {/* Form */}
@@ -88,7 +156,7 @@ export default function TambahPengeluaran() {
           <TouchableOpacity
             style={styles.dateButton}
             onPress={() => setShowDatePicker(true)}>
-            <Text>{tanggal.toDateString()}</Text>
+            <Text>{formatTanggalIndonesia(tanggal)}</Text>
             <Ionicons name="calendar-outline" size={20} />
           </TouchableOpacity>
 
@@ -102,7 +170,6 @@ export default function TambahPengeluaran() {
           </TouchableOpacity>
         </View>
 
-        {/* Picker tanggal */}
         {showDatePicker && (
           <DateTimePicker
             value={tanggal}
@@ -162,20 +229,34 @@ export default function TambahPengeluaran() {
           onChangeText={setJumlah}
         />
 
-        {/* Kategori */}
+        {/* Kategori Dipilih (bisa diketik manual) */}
+        <TextInput
+          style={styles.input}
+          placeholder="Kategori yang Dipilih"
+          value={kategoriDipilih}
+          onChangeText={setKategoriDipilih}
+          editable={true}
+        />
+
+        {/* Tombol Kategori */}
         <View style={styles.kategoriContainer}>
-          {['Makanan', 'Kos', 'Kesehatan', 'Transportasi', 'Jajan', 'Buah', 'Lain-lainnya'].map(
-            (item) => (
-              <TouchableOpacity key={item} style={styles.kategoriButton}>
-                <Text style={styles.kategoriText}>{item}</Text>
-              </TouchableOpacity>
-            )
-          )}
+          {kategoriList.map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={styles.kategoriButton}
+              onPress={() => pilihKategori(item)}>
+              <Text style={styles.kategoriText}>{item}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
+        {/* Tambah Kategori Baru */}
         <TextInput
           style={styles.input}
           placeholder="Tambah Kategori Baru"
+          value={kategoriBaru}
+          onChangeText={setKategoriBaru}
+          onSubmitEditing={handleSubmitEditing}
         />
 
         {/* Tombol Simpan */}
