@@ -1,22 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
+  Alert,
   FlatList,
+  Keyboard,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
-  Keyboard,
 } from 'react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import { insertTransaction, openDatabase } from '../database/database';
 
 export default function TambahPemasukan() {
   const navigation = useNavigation();
+  const db = openDatabase();
+
   const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
   const [tanggal, setTanggal] = useState(new Date());
   const [jam, setJam] = useState(new Date());
@@ -79,36 +83,48 @@ export default function TambahPemasukan() {
     handleTambahKategori();
   };
 
-  // ✅ Format tanggal: Hari, tanggal bulan tahun
   const formatTanggalIndonesia = (date: Date) => {
     const hariList = [
-      'Minggu',
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
+      'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu',
     ];
     const bulanList = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
     ];
     const hari = hariList[date.getDay()];
     const tgl = date.getDate();
     const bulan = bulanList[date.getMonth()];
     const tahun = date.getFullYear();
     return `${hari}, ${tgl} ${bulan} ${tahun}`;
+  };
+
+  // ✅ Simpan ke database pakai insertTransaction
+  const simpanKeDatabase = async () => {
+    if (!rekeningDipilih || !jumlah || !kategoriDipilih) {
+      Alert.alert('Peringatan', 'Lengkapi semua data terlebih dahulu!');
+      return;
+    }
+
+    try {
+      await insertTransaction(db, {
+        tanggal: tanggal.toISOString().split('T')[0],
+        jam: `${jam.getHours().toString().padStart(2,'0')}:${jam.getMinutes().toString().padStart(2,'0')}`,
+        rekening: rekeningDipilih,
+        jenis: 'income', // ✅ wajib dikirim agar NOT NULL tidak error
+        kategori: kategoriDipilih,
+        jumlah: parseFloat(jumlah),
+      });
+
+      Alert.alert('Berhasil', 'Pemasukan berhasil disimpan!', [
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } catch (error) {
+      console.error('❌ Gagal simpan transaksi:', error);
+      Alert.alert('Error', 'Gagal menyimpan transaksi.');
+    }
   };
 
   return (
@@ -123,7 +139,8 @@ export default function TambahPemasukan() {
                 <TouchableOpacity
                   key={item}
                   style={styles.rekeningButton}
-                  onPress={() => pilihRekening(item)}>
+                  onPress={() => pilihRekening(item)}
+                >
                   <Text style={styles.rekeningText}>{item}</Text>
                 </TouchableOpacity>
               ))}
@@ -136,7 +153,8 @@ export default function TambahPemasukan() {
       <View style={styles.topHeader}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}>
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Tambah Pemasukan</Text>
@@ -148,14 +166,16 @@ export default function TambahPemasukan() {
         <View style={styles.row}>
           <TouchableOpacity
             style={styles.dateButton}
-            onPress={() => showPickerHandler('date')}>
+            onPress={() => showPickerHandler('date')}
+          >
             <Text>{formatTanggalIndonesia(tanggal)}</Text>
             <Ionicons name="calendar-outline" size={20} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.timeButton}
-            onPress={() => showPickerHandler('time')}>
+            onPress={() => showPickerHandler('time')}
+          >
             <Text>
               {jam.getHours().toString().padStart(2, '0')}:
               {jam.getMinutes().toString().padStart(2, '0')}
@@ -163,7 +183,6 @@ export default function TambahPemasukan() {
           </TouchableOpacity>
         </View>
 
-        {/* Kalender & Time Picker modern */}
         <DateTimePickerModal
           isVisible={showPicker}
           mode={pickerMode || 'date'}
@@ -194,7 +213,8 @@ export default function TambahPemasukan() {
         <View style={styles.dropdownContainer}>
           <TouchableOpacity
             style={styles.dropdownButton}
-            onPress={() => setDropdownVisible(!dropdownVisible)}>
+            onPress={() => setDropdownVisible(!dropdownVisible)}
+          >
             <Text style={{ color: rekeningDipilih ? '#000' : '#999' }}>
               {rekeningDipilih || 'Pilih Rekening'}
             </Text>
@@ -213,7 +233,8 @@ export default function TambahPemasukan() {
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.dropdownItem}
-                    onPress={() => pilihDariDropdown(item)}>
+                    onPress={() => pilihDariDropdown(item)}
+                  >
                     <Text style={styles.dropdownText}>{item}</Text>
                   </TouchableOpacity>
                 )}
@@ -231,7 +252,7 @@ export default function TambahPemasukan() {
           onChangeText={setJumlah}
         />
 
-        {/* Kategori Dipilih (bisa diketik manual) */}
+        {/* Kategori */}
         <TextInput
           style={styles.input}
           placeholder="Kategori yang Dipilih"
@@ -246,7 +267,8 @@ export default function TambahPemasukan() {
             <TouchableOpacity
               key={item}
               style={styles.kategoriButton}
-              onPress={() => pilihKategori(item)}>
+              onPress={() => pilihKategori(item)}
+            >
               <Text style={styles.kategoriText}>{item}</Text>
             </TouchableOpacity>
           ))}
@@ -262,7 +284,7 @@ export default function TambahPemasukan() {
         />
 
         {/* Tombol Simpan */}
-        <TouchableOpacity style={styles.simpanButton}>
+        <TouchableOpacity style={styles.simpanButton} onPress={simpanKeDatabase}>
           <Text style={styles.simpanText}>Simpan</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -271,150 +293,28 @@ export default function TambahPemasukan() {
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  topHeader: {
-    backgroundColor: '#00A86B',
-    paddingTop: 50,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 50,
-    zIndex: 10,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  formContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 25,
-  },
-  header: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#007E33',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  rekeningButton: {
-    backgroundColor: '#E9E9E9',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 10,
-    margin: 5,
-  },
-  rekeningText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFEFEF',
-    padding: 10,
-    borderRadius: 8,
-    flex: 0.65,
-    justifyContent: 'space-between',
-  },
-  timeButton: {
-    backgroundColor: '#EFEFEF',
-    padding: 10,
-    borderRadius: 8,
-    flex: 0.3,
-    alignItems: 'center',
-  },
-  input: {
-    width: '100%',
-    backgroundColor: '#EFEFEF',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  dropdownContainer: {
-    position: 'relative',
-    width: '100%',
-    marginBottom: 15,
-  },
-  dropdownButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#EFEFEF',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  dropdownList: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    marginTop: 5,
-    elevation: 4,
-    maxHeight: 200,
-  },
-  dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-  },
-  dropdownText: {
-    fontSize: 16,
-  },
-  kategoriContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
-    marginVertical: 10,
-  },
-  kategoriButton: {
-    backgroundColor: '#00A86B',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  kategoriText: {
-    color: '#fff',
-  },
-  simpanButton: {
-    backgroundColor: '#00A86B',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    alignSelf: 'flex-end',
-  },
-  simpanText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContainer: { backgroundColor: '#fff', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  topHeader: { backgroundColor: '#00A86B', paddingTop: 50, paddingBottom: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, flexDirection: 'row', alignItems: 'center' },
+  backButton: { position: 'absolute', left: 20, top: 50, zIndex: 10 },
+  headerTitle: { flex: 1, textAlign: 'center', color: '#fff', fontSize: 20, fontWeight: '600' },
+  formContainer: { paddingHorizontal: 20, paddingVertical: 25 },
+  header: { fontSize: 20, fontWeight: 'bold', color: '#007E33', marginBottom: 20, textAlign: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+  rekeningButton: { backgroundColor: '#E9E9E9', paddingVertical: 15, paddingHorizontal: 25, borderRadius: 10, margin: 5 },
+  rekeningText: { fontSize: 16, fontWeight: '600' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  dateButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFEFEF', padding: 10, borderRadius: 8, flex: 0.65, justifyContent: 'space-between' },
+  timeButton: { backgroundColor: '#EFEFEF', padding: 10, borderRadius: 8, flex: 0.3, alignItems: 'center' },
+  input: { width: '100%', backgroundColor: '#EFEFEF', padding: 12, borderRadius: 8, marginBottom: 15 },
+  dropdownContainer: { position: 'relative', width: '100%', marginBottom: 15 },
+  dropdownButton: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#EFEFEF', padding: 12, borderRadius: 8, alignItems: 'center' },
+  dropdownList: { backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#ccc', marginTop: 5, elevation: 4, maxHeight: 200 },
+  dropdownItem: { paddingVertical: 12, paddingHorizontal: 15 },
+  dropdownText: { fontSize: 16 },
+  kategoriContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginVertical: 10 },
+  kategoriButton: { backgroundColor: '#00A86B', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
+  kategoriText: { color: '#fff' },
+  simpanButton: { backgroundColor: '#00A86B', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8, alignSelf: 'flex-end' },
+  simpanText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
