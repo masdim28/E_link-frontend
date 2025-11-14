@@ -29,6 +29,16 @@ export default function TransaksiScreen() {
   const router = useRouter();
   const db = openDatabase();
 
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+
+  const changeDate = (days: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + days);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
   const toggleOptions = () => {
     if (showOptions) {
       Animated.timing(fadeAnim, {
@@ -48,8 +58,11 @@ export default function TransaksiScreen() {
 
   const fetchTransactions = async () => {
     setLoading(true);
+
     const data = await getAllTransactions(db);
-    setTransactions(data);
+    const filtered = data.filter(item => item.tanggal === selectedDate);
+
+    setTransactions(filtered);
     setLoading(false);
   };
 
@@ -57,9 +70,10 @@ export default function TransaksiScreen() {
     fetchTransactions();
   }, []);
 
-  
-  // 🔧 Perhitungan total (tanpa ubah tampilan)
-   // ✅ Perhitungan total fix (pastikan semua kolom dinamis terbaca)
+  useEffect(() => {
+    fetchTransactions();
+  }, [selectedDate]);
+
   const totalIncome = transactions
     .filter(t => t.jenis === 'income')
     .reduce((sum, item) => {
@@ -96,16 +110,17 @@ export default function TransaksiScreen() {
 
     return (
       <View style={styles.item}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.itemTitle}>{item.rekening}</Text>
           <Text style={styles.itemCategory}>
             {kategoriKeys.join(', ')} - {item.tanggal} {item.jam}
           </Text>
         </View>
+
         <Text
           style={[
             styles.itemAmount,
-            { color: item.jenis === 'income' ? '#FFB84C' : '#D83A56' },
+            { color: item.jenis === 'income' ? '#00A86B' : '#D83A56' }, // ← perubahan warna pemasukan
           ]}
         >
           {item.jenis === 'income'
@@ -126,13 +141,32 @@ export default function TransaksiScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header hijau */}
+      {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Transaksi</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => changeDate(-1)}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <Text style={[styles.headerTitle, { marginHorizontal: 10 }]}>
+            {new Date(selectedDate).toLocaleDateString('id-ID', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </Text>
+
+          <TouchableOpacity onPress={() => changeDate(1)}>
+            <Ionicons name="chevron-forward" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* RINGKASAN */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Pemasukan</Text>
-            <Text style={[styles.summaryAmount, { color: '#FFB84C' }]}>
+            <Text style={[styles.summaryAmount, { color: '#00A86B' }]}> {/* ← berubah */}
               + {totalIncome.toLocaleString('id-ID')}
             </Text>
           </View>
@@ -144,14 +178,14 @@ export default function TransaksiScreen() {
           </View>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Selisih</Text>
-            <Text style={[styles.summaryAmount, { color: '#7A9D54' }]}>
+            <Text style={[styles.summaryAmount, { color: '#F4CE14' }]}> {/* ← berubah */}
               {difference.toLocaleString('id-ID')}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Daftar transaksi */}
+      {/* LIST */}
       <FlatList
         data={transactions}
         renderItem={renderItem}
@@ -159,15 +193,21 @@ export default function TransaksiScreen() {
         contentContainerStyle={styles.listContent}
         refreshing={loading}
         onRefresh={fetchTransactions}
+        ListEmptyComponent={() => (
+          <Text style={{ textAlign: 'center', marginTop: 30, color: '#777' }}>
+            Tidak ada transaksi pada tanggal ini.
+          </Text>
+        )}
       />
 
-      {/* Overlay + FAB */}
+      {/* OVERLAY MENU */}
       {showOptions && (
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={toggleOptions} />
         </Animated.View>
       )}
 
+      {/* FAB */}
       <View style={styles.fabContainer}>
         {showOptions && (
           <Animated.View style={[styles.optionContainer, { opacity: fadeAnim }]}>
@@ -182,6 +222,7 @@ export default function TransaksiScreen() {
                 <Ionicons name="card-outline" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
+
             <View style={styles.optionRow}>
               <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pengeluaran</Text>
@@ -195,6 +236,7 @@ export default function TransaksiScreen() {
             </View>
           </Animated.View>
         )}
+
         <TouchableOpacity style={styles.addButton} onPress={toggleOptions}>
           <Ionicons name={showOptions ? 'close' : 'add'} size={28} color="#fff" />
         </TouchableOpacity>
@@ -205,6 +247,7 @@ export default function TransaksiScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+
   header: {
     backgroundColor: '#00A86B',
     paddingTop: 50,
@@ -213,6 +256,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
+
   headerTitle: {
     color: '#fff',
     fontSize: 20,
@@ -220,6 +264,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 16,
   },
+
   summaryContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -227,20 +272,31 @@ const styles = StyleSheet.create({
     padding: 10,
     justifyContent: 'space-between',
   },
+
   summaryBox: { alignItems: 'center', flex: 1 },
   summaryTitle: { fontWeight: '600', color: '#000' },
   summaryAmount: { fontWeight: 'bold', marginTop: 4 },
+
   listContent: { paddingHorizontal: 16, paddingTop: 20 },
+
   item: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 0.6,
     borderColor: '#E5E5E5',
   },
+
   itemTitle: { fontSize: 16, fontWeight: 'bold' },
   itemCategory: { fontSize: 12, color: '#555' },
-  itemAmount: { fontSize: 16, fontWeight: '600' },
+
+  itemAmount: {
+    minWidth: 90,
+    textAlign: 'right',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
   fabContainer: { position: 'absolute', bottom: 25, right: 25, alignItems: 'center' },
   addButton: {
     backgroundColor: '#00A86B',
@@ -251,10 +307,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     elevation: 4,
   },
+
   optionContainer: { alignItems: 'flex-end', marginBottom: 10, gap: 12 },
   optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
   optionLabel: { backgroundColor: '#f2f2f2', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, marginRight: 8 },
   optionLabelText: { color: '#000', fontSize: 14, fontWeight: '500' },
   optionIcon: { width: 45, height: 45, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
 });
