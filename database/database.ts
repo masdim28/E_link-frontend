@@ -4,6 +4,7 @@ import * as SQLite from 'expo-sqlite';
 export function openDatabase() {
   const db = SQLite.openDatabaseSync('eling.db');
   ensureBaseTable(db);
+  
   return db;
 }
 
@@ -30,11 +31,9 @@ async function ensureBaseTable(db: SQLite.SQLiteDatabase) {
       return;
     }
 
-    // Jika ada kolom lama 'tipe', rename menjadi 'jenis'
+    // Rename kolom 'tipe' lama jadi 'jenis'
     if (colNames.includes('tipe') && !colNames.includes('jenis')) {
-      await db.execAsync(`
-        ALTER TABLE transaksi RENAME TO transaksi_old;
-      `);
+      await db.execAsync(`ALTER TABLE transaksi RENAME TO transaksi_old;`);
       await db.execAsync(`
         CREATE TABLE transaksi (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,31 +48,16 @@ async function ensureBaseTable(db: SQLite.SQLiteDatabase) {
         SELECT id, tanggal, jam, rekening, tipe FROM transaksi_old;
       `);
       await db.execAsync(`DROP TABLE transaksi_old;`);
-      console.log("✅ Kolom 'tipe' di-rename menjadi 'jenis'");
+      console.log("✅ Kolom 'tipe' diubah ke 'jenis'");
     }
 
-    // Tambahkan kolom jam kalau belum ada
-    if (!colNames.includes('jam')) {
-      await db.execAsync(`ALTER TABLE transaksi ADD COLUMN jam TEXT;`);
-      console.log("✅ Kolom 'jam' ditambahkan");
-    }
-
-    // Tambahkan kolom tanggal kalau belum ada
-    if (!colNames.includes('tanggal')) {
-      await db.execAsync(`ALTER TABLE transaksi ADD COLUMN tanggal TEXT;`);
-      console.log("✅ Kolom 'tanggal' ditambahkan");
-    }
-
-    // Tambahkan kolom rekening kalau belum ada
-    if (!colNames.includes('rekening')) {
-      await db.execAsync(`ALTER TABLE transaksi ADD COLUMN rekening TEXT;`);
-      console.log("✅ Kolom 'rekening' ditambahkan");
-    }
-
-    // Tambahkan kolom jenis kalau belum ada
-    if (!colNames.includes('jenis')) {
-      await db.execAsync(`ALTER TABLE transaksi ADD COLUMN jenis TEXT;`);
-      console.log("✅ Kolom 'jenis' ditambahkan");
+    // Tambahkan kolom dasar jika belum ada
+    const baseCols = ['tanggal', 'jam', 'rekening', 'jenis'];
+    for (const col of baseCols) {
+      if (!colNames.includes(col)) {
+        await db.execAsync(`ALTER TABLE transaksi ADD COLUMN ${col} TEXT;`);
+        console.log(`✅ Kolom '${col}' ditambahkan`);
+      }
     }
   } catch (err) {
     console.error("❌ Gagal memastikan struktur tabel:", err);
@@ -97,7 +81,7 @@ export async function ensureCategoryColumn(db: SQLite.SQLiteDatabase, kategori: 
   const cols = await getExistingColumns(db);
 
   if (!cols.includes(cleanName)) {
-    const countKategori = cols.length - 5; // kolom dasar: id, tanggal, jam, rekening, jenis
+    const countKategori = cols.length - 5; // kolom dasar
     if (countKategori >= 50) {
       console.warn('⚠️ Maksimal 50 kategori sudah tercapai');
       return false;
@@ -116,7 +100,7 @@ export async function ensureCategoryColumn(db: SQLite.SQLiteDatabase, kategori: 
   return true;
 }
 
-// Insert transaksi umum
+// Simpan transaksi umum
 export async function insertTransaction(
   db: SQLite.SQLiteDatabase,
   {
@@ -130,7 +114,7 @@ export async function insertTransaction(
     tanggal: string;
     jam: string;
     rekening: string;
-    jenis: string; // 'income' atau 'expense'
+    jenis: string;
     kategori: string;
     jumlah: number;
   }
@@ -146,13 +130,13 @@ export async function insertTransaction(
        VALUES (?, ?, ?, ?, ?);`,
       [tanggal, jam, rekening, jenis, jumlah]
     );
-    console.log(`💾 Transaksi '${kategori}' (${jenis}) berhasil disimpan`);
+    console.log(`💾 Transaksi '${kategori}' (${jenis}) disimpan`);
   } catch (error) {
     console.error('❌ Gagal simpan transaksi:', error);
   }
 }
 
-// Versi khusus pemasukan
+// Pemasukan
 export async function insertPemasukan(
   db: SQLite.SQLiteDatabase,
   {
@@ -179,7 +163,7 @@ export async function insertPemasukan(
   });
 }
 
-// Versi khusus pengeluaran
+// Pengeluaran
 export async function insertPengeluaran(
   db: SQLite.SQLiteDatabase,
   {
@@ -206,11 +190,25 @@ export async function insertPengeluaran(
   });
 }
 
-// Ambil semua transaksi
+// Ambil semua transaksi & normalisasi
 export async function getAllTransactions(db: SQLite.SQLiteDatabase): Promise<any[]> {
   try {
     const data = await db.getAllAsync<any>('SELECT * FROM transaksi;');
-    return data;
+    const allCols = await getExistingColumns(db);
+    const kategoriCols = allCols.filter(
+      c => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(c)
+    );
+
+    // Pastikan semua baris punya semua kolom kategori
+    const normalized = data.map(row => {
+      const filled = { ...row };
+      for (const col of kategoriCols) {
+        if (filled[col] == null) filled[col] = 0;
+      }
+      return filled;
+    });
+
+    return normalized;
   } catch (error) {
     console.error('❌ Gagal ambil data:', error);
     return [];

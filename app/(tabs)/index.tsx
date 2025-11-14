@@ -1,4 +1,3 @@
-// app/(tabs)/index.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -19,7 +18,7 @@ type Transaction = {
   tanggal: string;
   jam: string;
   rekening: string;
-  [key: string]: any; // kolom kategori dinamis
+  [key: string]: any;
 };
 
 export default function TransaksiScreen() {
@@ -58,28 +57,34 @@ export default function TransaksiScreen() {
     fetchTransactions();
   }, []);
 
-  // Hitung total pemasukan & pengeluaran
-  const totalIncome = transactions.reduce((sum, item) => {
-    if (item.jenis === 'income') {
-      const kategoriKeys = Object.keys(item).filter(
-        k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
-      );
-      const jumlahKategori = kategoriKeys.reduce((s, key) => s + (item[key] || 0), 0);
-      return sum + jumlahKategori;
-    }
-    return sum;
-  }, 0);
+  
+  // 🔧 Perhitungan total (tanpa ubah tampilan)
+   // ✅ Perhitungan total fix (pastikan semua kolom dinamis terbaca)
+  const totalIncome = transactions
+    .filter(t => t.jenis === 'income')
+    .reduce((sum, item) => {
+      let totalKategori = 0;
+      for (const [key, val] of Object.entries(item)) {
+        if (!['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(key)) {
+          const num = Number(val);
+          if (!isNaN(num) && num > 0) totalKategori += num;
+        }
+      }
+      return sum + totalKategori;
+    }, 0);
 
-  const totalExpense = transactions.reduce((sum, item) => {
-    if (item.jenis === 'expense') {
-      const kategoriKeys = Object.keys(item).filter(
-        k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
-      );
-      const jumlahKategori = kategoriKeys.reduce((s, key) => s + (item[key] || 0), 0);
-      return sum + jumlahKategori;
-    }
-    return sum;
-  }, 0);
+  const totalExpense = transactions
+    .filter(t => t.jenis === 'expense')
+    .reduce((sum, item) => {
+      let totalKategori = 0;
+      for (const [key, val] of Object.entries(item)) {
+        if (!['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(key)) {
+          const num = Number(val);
+          if (!isNaN(num) && num > 0) totalKategori += num;
+        }
+      }
+      return sum + totalKategori;
+    }, 0);
 
   const difference = totalIncome - totalExpense;
 
@@ -87,7 +92,7 @@ export default function TransaksiScreen() {
     const kategoriKeys = Object.keys(item).filter(
       k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
     );
-    const totalAmount = kategoriKeys.reduce((s, key) => s + (item[key] || 0), 0);
+    const totalAmount = kategoriKeys.reduce((s, key) => s + (Number(item[key]) || 0), 0);
 
     return (
       <View style={styles.item}>
@@ -156,14 +161,13 @@ export default function TransaksiScreen() {
         onRefresh={fetchTransactions}
       />
 
-      {/* Overlay untuk menutup opsi */}
+      {/* Overlay + FAB */}
       {showOptions && (
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={toggleOptions} />
         </Animated.View>
       )}
 
-      {/* Tombol tambah + dua opsi */}
       <View style={styles.fabContainer}>
         {showOptions && (
           <Animated.View style={[styles.optionContainer, { opacity: fadeAnim }]}>
