@@ -130,14 +130,15 @@ export default function TambahPengeluaran() {
     }
 
     try {
-      await insertTransaction(db, {
-        tanggal: tanggal.toISOString().split('T')[0],
-        jam: jam.toTimeString().split(' ')[0],
-        rekening: rekeningDipilih,
-        jenis: 'pengeluaran',
-        kategori: kategoriDipilih,
-        jumlah: parseFloat(jumlah),
-      });
+     await insertTransaction(db, {
+  tanggal: tanggal.toISOString().split('T')[0],
+  jam: jam.toTimeString().split(' ')[0],
+  rekening: rekeningDipilih,
+  jenis: 'expense',  // FIX PENTING
+  kategori: kategoriDipilih,
+  jumlah: parseFloat(jumlah),
+});
+
 
       Alert.alert('Berhasil', 'Transaksi pengeluaran berhasil disimpan.');
       navigation.goBack();
