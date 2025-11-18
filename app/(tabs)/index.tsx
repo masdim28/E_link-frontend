@@ -102,6 +102,9 @@ export default function TransaksiScreen() {
 
   const difference = totalIncome - totalExpense;
 
+  // ============================
+  // ITEM LIST → KLIK UNTUK EDIT
+  // ============================
   const renderItem = ({ item }: { item: Transaction }) => {
     const kategoriKeys = Object.keys(item).filter(
       k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
@@ -109,25 +112,42 @@ export default function TransaksiScreen() {
     const totalAmount = kategoriKeys.reduce((s, key) => s + (Number(item[key]) || 0), 0);
 
     return (
-      <View style={styles.item}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.itemTitle}>{item.rekening}</Text>
-          <Text style={styles.itemCategory}>
-            {kategoriKeys.join(', ')} - {item.tanggal} {item.jam}
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: '/edit-transaksi',
+            params: {
+              id: item.id,
+              jenis: item.jenis,
+              tanggal: item.tanggal,
+              jam: item.jam,
+              rekening: item.rekening,
+              jumlah: totalAmount.toString(),
+              kategori: kategoriKeys.join(','),
+            },
+          })
+        }
+      >
+        <View style={styles.item}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{item.rekening}</Text>
+            <Text style={styles.itemCategory}>
+              {kategoriKeys.join(', ')} - {item.tanggal} {item.jam}
+            </Text>
+          </View>
+
+          <Text
+            style={[
+              styles.itemAmount,
+              { color: item.jenis === 'income' ? '#00A86B' : '#D83A56' },
+            ]}
+          >
+            {item.jenis === 'income'
+              ? `+ ${totalAmount.toLocaleString('id-ID')}`
+              : `- ${totalAmount.toLocaleString('id-ID')}`}
           </Text>
         </View>
-
-        <Text
-          style={[
-            styles.itemAmount,
-            { color: item.jenis === 'income' ? '#00A86B' : '#D83A56' }, // ← perubahan warna pemasukan
-          ]}
-        >
-          {item.jenis === 'income'
-            ? `+ ${totalAmount.toLocaleString('id-ID')}`
-            : `- ${totalAmount.toLocaleString('id-ID')}`}
-        </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -166,19 +186,21 @@ export default function TransaksiScreen() {
         <View style={styles.summaryContainer}>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Pemasukan</Text>
-            <Text style={[styles.summaryAmount, { color: '#00A86B' }]}> {/* ← berubah */}
+            <Text style={[styles.summaryAmount, { color: '#00A86B' }]}>
               + {totalIncome.toLocaleString('id-ID')}
             </Text>
           </View>
+
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Pengeluaran</Text>
             <Text style={[styles.summaryAmount, { color: '#D83A56' }]}>
               - {totalExpense.toLocaleString('id-ID')}
             </Text>
           </View>
+
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Selisih</Text>
-            <Text style={[styles.summaryAmount, { color: '#F4CE14' }]}> {/* ← berubah */}
+            <Text style={[styles.summaryAmount, { color: '#F4CE14' }]}>
               {difference.toLocaleString('id-ID')}
             </Text>
           </View>
@@ -211,6 +233,7 @@ export default function TransaksiScreen() {
       <View style={styles.fabContainer}>
         {showOptions && (
           <Animated.View style={[styles.optionContainer, { opacity: fadeAnim }]}>
+            {/* PEMASUKAN */}
             <View style={styles.optionRow}>
               <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pemasukan</Text>
@@ -223,6 +246,7 @@ export default function TransaksiScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* PENGELUARAN */}
             <View style={styles.optionRow}>
               <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pengeluaran</Text>
