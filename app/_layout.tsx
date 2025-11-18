@@ -27,7 +27,7 @@ export default function RootLayout() {
       {isLoggedIn ? (
         <Stack.Screen name="(tabs)" />
       ) : (
-        <Stack.Screen name="SplashScreen" />
+        <Stack.Screen name="index" />
       )}
     </Stack>
   );

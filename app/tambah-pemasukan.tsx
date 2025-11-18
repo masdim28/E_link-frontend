@@ -98,7 +98,20 @@ export default function TambahPemasukan() {
     return `${hari}, ${tgl} ${bulan} ${tahun}`;
   };
 
+
+  // =================================================
+  // ✅ Tambahan: format angka menjadi ribuan (1.000)
+  // =================================================
+  const formatRibuan = (value: string) => {
+    const numberString = value.replace(/\./g, '');
+    if (!numberString) return '';
+    return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+
+
+  // =================================================
   // ✅ Simpan ke database pakai insertTransaction
+  // =================================================
   const simpanKeDatabase = async () => {
     if (!rekeningDipilih || !jumlah || !kategoriDipilih) {
       Alert.alert('Peringatan', 'Lengkapi semua data terlebih dahulu!');
@@ -110,9 +123,11 @@ export default function TambahPemasukan() {
         tanggal: tanggal.toISOString().split('T')[0],
         jam: `${jam.getHours().toString().padStart(2,'0')}:${jam.getMinutes().toString().padStart(2,'0')}`,
         rekening: rekeningDipilih,
-        jenis: 'income', // ✅ wajib dikirim agar NOT NULL tidak error
+        jenis: 'income',
         kategori: kategoriDipilih,
-        jumlah: parseFloat(jumlah),
+
+        // ❗ Hapus titik dulu sebelum simpan
+        jumlah: parseFloat(jumlah.replace(/\./g, '')),
       });
 
       Alert.alert('Berhasil', 'Pemasukan berhasil disimpan!', [
@@ -243,13 +258,13 @@ export default function TambahPemasukan() {
           )}
         </View>
 
-        {/* Jumlah */}
+        {/* Jumlah (SUDAH DIFORMAT RIBUAN) */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
           keyboardType="numeric"
           value={jumlah}
-          onChangeText={setJumlah}
+          onChangeText={(text) => setJumlah(formatRibuan(text))}
         />
 
         {/* Kategori */}

@@ -25,6 +25,8 @@ export default function TransaksiScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
   const fadeAnim = useState(new Animated.Value(0))[0];
   const router = useRouter();
   const db = openDatabase();
@@ -58,10 +60,8 @@ export default function TransaksiScreen() {
 
   const fetchTransactions = async () => {
     setLoading(true);
-
     const data = await getAllTransactions(db);
     const filtered = data.filter(item => item.tanggal === selectedDate);
-
     setTransactions(filtered);
     setLoading(false);
   };
@@ -102,14 +102,15 @@ export default function TransaksiScreen() {
 
   const difference = totalIncome - totalExpense;
 
-  // ============================
-  // ITEM LIST → KLIK UNTUK EDIT
-  // ============================
   const renderItem = ({ item }: { item: Transaction }) => {
     const kategoriKeys = Object.keys(item).filter(
       k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
     );
-    const totalAmount = kategoriKeys.reduce((s, key) => s + (Number(item[key]) || 0), 0);
+
+    const totalAmount = kategoriKeys.reduce(
+      (s, key) => s + (Number(item[key]) || 0),
+      0
+    );
 
     return (
       <TouchableOpacity
@@ -139,7 +140,10 @@ export default function TransaksiScreen() {
           <Text
             style={[
               styles.itemAmount,
-              { color: item.jenis === 'income' ? '#00A86B' : '#D83A56' },
+              {
+                color:
+                  item.jenis === 'income' ? '#00A86B' : '#D83A56',
+              },
             ]}
           >
             {item.jenis === 'income'
@@ -153,7 +157,12 @@ export default function TransaksiScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { justifyContent: 'center', alignItems: 'center' },
+        ]}
+      >
         <ActivityIndicator size="large" color="#00A86B" />
       </View>
     );
@@ -163,7 +172,13 @@ export default function TransaksiScreen() {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
           <TouchableOpacity onPress={() => changeDate(-1)}>
             <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
@@ -180,27 +195,41 @@ export default function TransaksiScreen() {
           <TouchableOpacity onPress={() => changeDate(1)}>
             <Ionicons name="chevron-forward" size={24} color="#fff" />
           </TouchableOpacity>
+
+          {/* Ikon Kertas → Arahkan ke fitur-baru */}
+          <TouchableOpacity
+            onPress={() => router.push('/riwayat')}
+            style={{ marginLeft: 20 }}
+          >
+            <Ionicons name="document-outline" size={26} color="#fff" />
+          </TouchableOpacity>
         </View>
 
-        {/* RINGKASAN */}
+        {/* SUMMARY */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Pemasukan</Text>
-            <Text style={[styles.summaryAmount, { color: '#00A86B' }]}>
+            <Text
+              style={[styles.summaryAmount, { color: '#00A86B' }]}
+            >
               + {totalIncome.toLocaleString('id-ID')}
             </Text>
           </View>
 
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Pengeluaran</Text>
-            <Text style={[styles.summaryAmount, { color: '#D83A56' }]}>
+            <Text
+              style={[styles.summaryAmount, { color: '#D83A56' }]}
+            >
               - {totalExpense.toLocaleString('id-ID')}
             </Text>
           </View>
 
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Selisih</Text>
-            <Text style={[styles.summaryAmount, { color: '#F4CE14' }]}>
+            <Text
+              style={[styles.summaryAmount, { color: '#F4CE14' }]}
+            >
               {difference.toLocaleString('id-ID')}
             </Text>
           </View>
@@ -216,7 +245,13 @@ export default function TransaksiScreen() {
         refreshing={loading}
         onRefresh={fetchTransactions}
         ListEmptyComponent={() => (
-          <Text style={{ textAlign: 'center', marginTop: 30, color: '#777' }}>
+          <Text
+            style={{
+              textAlign: 'center',
+              marginTop: 30,
+              color: '#777',
+            }}
+          >
             Tidak ada transaksi pada tanggal ini.
           </Text>
         )}
@@ -224,47 +259,108 @@ export default function TransaksiScreen() {
 
       {/* OVERLAY MENU */}
       {showOptions && (
-        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={toggleOptions} />
+        <Animated.View
+          style={[styles.overlay, { opacity: fadeAnim }]}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={toggleOptions}
+          />
         </Animated.View>
       )}
 
-      {/* FAB */}
+      {/* FAB MENU */}
       <View style={styles.fabContainer}>
         {showOptions && (
-          <Animated.View style={[styles.optionContainer, { opacity: fadeAnim }]}>
-            {/* PEMASUKAN */}
+          <Animated.View
+            style={[styles.optionContainer, { opacity: fadeAnim }]}
+          >
             <View style={styles.optionRow}>
               <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pemasukan</Text>
               </View>
+
               <TouchableOpacity
-                style={[styles.optionIcon, { backgroundColor: '#00A86B' }]}
+                style={[
+                  styles.optionIcon,
+                  { backgroundColor: '#00A86B' },
+                ]}
                 onPress={() => router.push('/tambah-pemasukan')}
               >
-                <Ionicons name="card-outline" size={20} color="#fff" />
+                <Ionicons
+                  name="card-outline"
+                  size={20}
+                  color="#fff"
+                />
               </TouchableOpacity>
             </View>
 
-            {/* PENGELUARAN */}
             <View style={styles.optionRow}>
               <View style={styles.optionLabel}>
                 <Text style={styles.optionLabelText}>Pengeluaran</Text>
               </View>
+
               <TouchableOpacity
-                style={[styles.optionIcon, { backgroundColor: '#D83A56' }]}
+                style={[
+                  styles.optionIcon,
+                  { backgroundColor: '#D83A56' },
+                ]}
                 onPress={() => router.push('/tambah-pengeluaran')}
               >
-                <Ionicons name="bag-handle-outline" size={20} color="#fff" />
+                <Ionicons
+                  name="bag-handle-outline"
+                  size={20}
+                  color="#fff"
+                />
               </TouchableOpacity>
             </View>
           </Animated.View>
         )}
 
-        <TouchableOpacity style={styles.addButton} onPress={toggleOptions}>
-          <Ionicons name={showOptions ? 'close' : 'add'} size={28} color="#fff" />
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={toggleOptions}
+        >
+          <Ionicons
+            name={showOptions ? 'close' : 'add'}
+            size={28}
+            color="#fff"
+          />
         </TouchableOpacity>
       </View>
+
+      {/* FORM POPUP */}
+      {showForm && (
+        <View style={styles.formOverlay}>
+          <View style={styles.formBox}>
+            <Text style={styles.formTitle}>Form Baru</Text>
+            <Text style={{ marginBottom: 6 }}>Masukkan sesuatu:</Text>
+
+            <View style={styles.formInput} />
+
+            <View
+              style={{
+                flexDirection: 'row',
+                marginTop: 20,
+                justifyContent: 'flex-end',
+              }}
+            >
+              <TouchableOpacity onPress={() => setShowForm(false)}>
+                <Text
+                  style={{
+                    color: '#D83A56',
+                    fontWeight: '600',
+                    fontSize: 16,
+                  }}
+                >
+                  Tutup
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -321,7 +417,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  fabContainer: { position: 'absolute', bottom: 25, right: 25, alignItems: 'center' },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 25,
+    right: 25,
+    alignItems: 'center',
+  },
+
   addButton: {
     backgroundColor: '#00A86B',
     width: 55,
@@ -333,10 +435,66 @@ const styles = StyleSheet.create({
   },
 
   optionContainer: { alignItems: 'flex-end', marginBottom: 10, gap: 12 },
-  optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
-  optionLabel: { backgroundColor: '#f2f2f2', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, marginRight: 8 },
-  optionLabelText: { color: '#000', fontSize: 14, fontWeight: '500' },
-  optionIcon: { width: 45, height: 45, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
 
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+
+  optionLabel: {
+    backgroundColor: '#f2f2f2',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+
+  optionLabelText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  optionIcon: {
+    width: 45,
+    height: 45,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+
+  formOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  formBox: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    elevation: 6,
+  },
+
+  formTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
+
+  formInput: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+  },
 });

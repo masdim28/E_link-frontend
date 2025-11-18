@@ -122,7 +122,17 @@ export default function TambahPengeluaran() {
     return `${hari}, ${tanggal} ${bulan} ${tahun}`;
   };
 
-  // ✅ Fungsi simpan ke database
+  // ================================
+  //  ✅ Format Ribuan (Tidak Ubah UI)
+  // ================================
+  const formatRupiah = (value: string) => {
+    const numberString = value.replace(/\D/g, '');
+    return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+
+  // ================================
+  //  SIMPAN KE DATABASE
+  // ================================
   const handleSimpan = async () => {
     if (!rekeningDipilih || !kategoriDipilih || !jumlah) {
       Alert.alert('Peringatan', 'Harap lengkapi semua data sebelum menyimpan.');
@@ -130,15 +140,14 @@ export default function TambahPengeluaran() {
     }
 
     try {
-     await insertTransaction(db, {
-  tanggal: tanggal.toISOString().split('T')[0],
-  jam: jam.toTimeString().split(' ')[0],
-  rekening: rekeningDipilih,
-  jenis: 'expense',  // FIX PENTING
-  kategori: kategoriDipilih,
-  jumlah: parseFloat(jumlah),
-});
-
+      await insertTransaction(db, {
+        tanggal: tanggal.toISOString().split('T')[0],
+        jam: jam.toTimeString().split(' ')[0],
+        rekening: rekeningDipilih,
+        jenis: 'expense',
+        kategori: kategoriDipilih,
+        jumlah: parseFloat(jumlah.replace(/\./g, '')), // penting
+      });
 
       Alert.alert('Berhasil', 'Transaksi pengeluaran berhasil disimpan.');
       navigation.goBack();
@@ -254,13 +263,15 @@ export default function TambahPengeluaran() {
           )}
         </View>
 
-        {/* Jumlah */}
+        {/* ======================================= */}
+        {/*         INPUT JUMLAH (diformat)         */}
+        {/* ======================================= */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
           keyboardType="numeric"
           value={jumlah}
-          onChangeText={setJumlah}
+          onChangeText={(text) => setJumlah(formatRupiah(text))}
         />
 
         {/* Kategori Dipilih */}
