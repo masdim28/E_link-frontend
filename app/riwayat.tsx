@@ -1,102 +1,161 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-// Import fungsi dari database.ts
 import { getAllTransactions, openDatabase } from "../database/database";
 
-// Definisikan tipe data untuk transaksi agar lebih rapi (optional tapi disarankan)
 interface Transaksi {
   id: number;
   tanggal: string;
   jam: string;
   rekening: string;
-  jenis: 'income' | 'expense';
-  [kategori: string]: any; // Untuk kolom kategori dinamis
+  jenis: "income" | "expense";
+  [kategori: string]: any;
 }
 
-// Komponen untuk menampilkan satu item transaksi
+const formatTanggalHeader = (tgl: string) => {
+  try {
+    const date = new Date(tgl);
+    const hari = date.toLocaleDateString("id-ID", { weekday: "long" });
+    const bulan = date.toLocaleDateString("id-ID", { month: "short" });
+    const tglHari = date.getDate();
+    const tahun = date.getFullYear();
+
+    return { tglHari, bulan, tahun, hari };
+  } catch {
+    return null;
+  }
+};
+
 const TransaksiItem = ({ item }: { item: Transaksi }) => {
-  // Mencari nama kategori dan nilai (asumsi hanya ada satu kolom kategori per transaksi)
   const kategoriCols = Object.keys(item).filter(
-    (key) => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(key) && item[key] !== null && item[key] !== 0
+    (key) =>
+      !["id", "tanggal", "jam", "rekening", "jenis"].includes(key) &&
+      item[key] !== null &&
+      item[key] !== 0
   );
 
-  const kategori = kategoriCols.length > 0 ? kategoriCols[0].replace(/_/g, ' ') : 'Tidak Ada Kategori';
+  const kategori =
+    kategoriCols.length > 0
+      ? kategoriCols[0].replace(/_/g, " ")
+      : "Tidak Ada Kategori";
+
   const jumlah = kategoriCols.length > 0 ? item[kategoriCols[0]] : 0;
-  const isPemasukan = item.jenis === 'income';
+  const isPemasukan = item.jenis === "income";
 
   return (
-    <View style={styles.itemContainer}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {/* Ikon berdasarkan jenis */}
-        <Ionicons 
-          name={isPemasukan ? "arrow-up-circle" : "arrow-down-circle"} 
-          size={24} 
-          color={isPemasukan ? "#00A86B" : "#D9534F"} 
-        />
-        <View style={{ marginLeft: 10 }}>
-          <Text style={styles.itemKategori}>{kategori}</Text>
-          <Text style={styles.itemTanggal}>{`${item.tanggal} ${item.jam} (${item.rekening})`}</Text>
-        </View>
+    <View style={styles.itemTransaksi}>
+      <View>
+        <Text style={styles.kategoriText}>{kategori}</Text>
+        <Text style={styles.rekeningText}>{item.rekening}</Text>
       </View>
-      <Text style={[styles.itemJumlah, { color: isPemasukan ? '#00A86B' : '#D9534F' }]}>
-        {`${isPemasukan ? '+' : '-'} Rp${jumlah.toLocaleString('id-ID')}`}
+
+      <Text
+        style={[
+          styles.jumlahText,
+          { color: isPemasukan ? "#00A86B" : "#D9534F" },
+        ]}
+      >
+        {`${isPemasukan ? "+" : "-"}${jumlah.toLocaleString("id-ID")}`}
       </Text>
     </View>
   );
 };
 
+const TanggalHeader = ({
+  tgl,
+  totalIncome,
+  totalExpense,
+}: {
+  tgl: string;
+  totalIncome: number;
+  totalExpense: number;
+}) => {
+  const d = formatTanggalHeader(tgl);
+  if (!d) return null;
+
+  const selisih = totalIncome - totalExpense;
+
+  return (
+    <View style={styles.headerTanggalContainer}>
+      <View style={styles.tanggalBox}>
+        <Text style={styles.tanggalAngka}>{d.tglHari}</Text>
+
+        <View style={{ marginLeft: 5 }}>
+          <Text style={styles.tanggalBulan}>{`${d.bulan} ${d.tahun}`}</Text>
+          <Text style={styles.tanggalHari}>{d.hari}</Text>
+        </View>
+
+        {/* === TOTAL INCOME / EXPENSE / SELISIH === */}
+        <View style={styles.totalWrapper}>
+          <Text style={[styles.totalAngka, { color: "#00A86B" }]}>
+            +{totalIncome.toLocaleString("id-ID")}
+          </Text>
+
+          <Text style={[styles.totalAngka, { color: "#D9534F" }]}>
+            -{totalExpense.toLocaleString("id-ID")}
+          </Text>
+
+          <Text
+            style={[
+              styles.totalAngka,
+              { color: selisih >= 0 ? "#00A86B" : "#D9534F" },
+            ]}
+          >
+            {`${selisih >= 0 ? "+" : "-"}${Math.abs(selisih).toLocaleString(
+              "id-ID"
+            )}`}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+};
 
 export default function Riwayat() {
   const router = useRouter();
-  const [transaksiData, setTransaksiData] = useState<Transaksi[]>([]);
+  const [groupedData, setGroupedData] = useState<any>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fungsi untuk mengambil data transaksi dari database
   const loadTransactions = useCallback(async () => {
     setIsLoading(true);
-    try {
-      // 1. Buka koneksi database
-      const db = openDatabase(); 
-      // 2. Ambil semua data
-      const data = await getAllTransactions(db); 
 
-      // Data yang baru diambil akan terbalik (yang terbaru di bawah), kita balik agar terbaru di atas
-      setTransaksiData(data.reverse() as Transaksi[]); 
-      
-    } catch (error) {
-      console.error("Gagal mengambil riwayat transaksi:", error);
+    try {
+      const db = openDatabase();
+      const data = await getAllTransactions(db);
+
+      const grouped: any = {};
+      data.forEach((t: any) => {
+        if (!grouped[t.tanggal]) grouped[t.tanggal] = [];
+        grouped[t.tanggal].push(t);
+      });
+
+      setGroupedData(grouped);
+    } catch (e) {
+      console.error("Gagal load:", e);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // useFocusEffect digunakan agar data dimuat ulang setiap kali halaman ini dibuka
   useFocusEffect(
     useCallback(() => {
       loadTransactions();
-      // Cleanup function (tidak ada yang perlu di-cleanup untuk case ini)
-      return () => {}; 
     }, [loadTransactions])
   );
-  
-  // Fungsi untuk merender list kosong
-  const renderEmptyList = () => (
-    <View style={styles.emptyContainer}>
-        {isLoading ? (
-            <ActivityIndicator size="large" color="#00A86B" />
-        ) : (
-            <Text style={styles.emptyText}>Belum ada transaksi yang tercatat.</Text>
-        )}
-    </View>
-  );
 
+  const tanggalList = Object.keys(groupedData).sort().reverse();
 
   return (
     <View style={styles.container}>
-      
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -105,77 +164,163 @@ export default function Riwayat() {
         <Text style={styles.headerTitle}>Riwayat</Text>
       </View>
 
-      {/* CONTENT */}
-      <FlatList
-        data={transaksiData}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => <TransaksiItem item={item} />}
-        ListEmptyComponent={renderEmptyList}
-        contentContainerStyle={styles.listContent}
-        refreshing={isLoading}
-        onRefresh={loadTransactions}
-      />
-      
+      {isLoading ? (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color="#00A86B" />
+        </View>
+      ) : tanggalList.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Belum ada transaksi.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={tanggalList}
+          keyExtractor={(item) => item}
+          renderItem={({ item }) => {
+            const income = groupedData[item]
+              .filter((x: Transaksi) => x.jenis === "income")
+              .reduce((sum: number, t: any) => {
+                const k = Object.keys(t).find(
+                  (key) =>
+                    !["id", "tanggal", "jam", "rekening", "jenis"].includes(
+                      key
+                    ) && t[key] !== 0
+                );
+                return sum + (k ? t[k] : 0);
+              }, 0);
+
+            const expense = groupedData[item]
+              .filter((x: Transaksi) => x.jenis === "expense")
+              .reduce((sum: number, t: any) => {
+                const k = Object.keys(t).find(
+                  (key) =>
+                    !["id", "tanggal", "jam", "rekening", "jenis"].includes(
+                      key
+                    ) && t[key] !== 0
+                );
+                return sum + (k ? t[k] : 0);
+              }, 0);
+
+            return (
+              <View style={styles.tanggalWrapper}>
+                <View style={styles.sekatTanggalAtas} />
+
+                <TanggalHeader
+                  tgl={item}
+                  totalIncome={income}
+                  totalExpense={expense}
+                />
+
+                <View style={styles.garisTanggalKhusus} />
+
+                {groupedData[item].map((t: Transaksi) => (
+                  <TransaksiItem key={t.id} item={t} />
+                ))}
+
+                <View style={styles.sekatTanggalBawah} />
+              </View>
+            );
+          }}
+        />
+      )}
     </View>
   );
 }
 
-
-// Styling Sederhana
 const styles = StyleSheet.create({
-    container: {
-        flex: 1, 
-        backgroundColor: '#f9f9f9' // Ubah background agar ada kontras
-    },
-    header: {
-        paddingTop: 50,
-        paddingBottom: 20,
-        paddingHorizontal: 16,
-        backgroundColor: '#00A86B',
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 20,
-        color: '#fff',
-        fontWeight: '600',
-        marginLeft: 125,
-    },
-    itemContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        backgroundColor: '#fff',
-    },
-    itemKategori: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    itemTanggal: {
-        fontSize: 12,
-        color: '#888',
-        marginTop: 2,
-    },
-    itemJumlah: {
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingTop: 50
-    },
-    emptyText: {
-        fontSize: 18, 
-        color: '#666', 
-        fontWeight: "600"
-    },
-    listContent: {
-        flexGrow: 1
-    }
+  container: { flex: 1, backgroundColor: "#fff" },
+
+  header: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    backgroundColor: "#00A86B",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "600",
+    marginLeft: 20,
+  },
+
+  tanggalWrapper: {
+    backgroundColor: "#fafafa",
+    marginBottom: 4,
+  },
+
+  sekatTanggalAtas: {
+    height: 0.4,
+    backgroundColor: "#D3D3D3",
+    marginHorizontal: 16,
+    marginBottom: 4,
+  },
+
+  garisTanggalKhusus: {
+    borderBottomWidth: 0.6,
+    borderBottomColor: "#CFCFCF",
+    opacity: 0.9,
+    marginHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+
+  sekatTanggalBawah: {
+    height: 0.4,
+    backgroundColor: "#D5D5D5",
+    marginHorizontal: 16,
+    marginTop: 6,
+    opacity: 0.8,
+  },
+
+  headerTanggalContainer: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+  },
+
+  tanggalBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  tanggalAngka: { fontSize: 32, fontWeight: "700" },
+  tanggalBulan: { fontSize: 14, fontWeight: "500" },
+
+  tanggalHari: {
+    marginTop: 2,
+    backgroundColor: "#ddd",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    fontSize: 12,
+  },
+
+  totalWrapper: {
+    flexDirection: "row",
+    gap: 20,
+    marginLeft: "auto",
+  },
+
+  totalAngka: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  itemTransaksi: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+  },
+
+  kategoriText: { fontSize: 16, fontWeight: "600" },
+  rekeningText: { fontSize: 13, color: "#888" },
+  jumlahText: { fontSize: 16, fontWeight: "600" },
+
+  emptyContainer: { marginTop: 50, alignItems: "center" },
+  emptyText: { fontSize: 16, color: "#777" },
 });

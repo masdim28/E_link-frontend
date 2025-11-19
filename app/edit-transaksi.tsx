@@ -2,110 +2,211 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
+  Alert,
+  FlatList,
+  Keyboard,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
+  View
 } from 'react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 import {
+  ensureCategoryColumn,
   getAllTransactions,
   openDatabase,
-  ensureCategoryColumn,
 } from '../database/database';
 
-// 🔥 Tambahkan tipe transaksi agar TS tidak error
 type TransaksiRow = {
   id: number;
   tanggal: string;
   jam: string;
   rekening: string;
   jenis: 'income' | 'expense';
-  [key: string]: any; // kategori dinamis
+  [key: string]: any;
 };
+
+const LIST_REKENING = [
+  'BJB', 'Mandiri', 'BRI', 'BNI', 'BSI', 'BCA', 'Gopay', 'Dana', 'ShopeePay', 'OVO', 'Cash', 'Lainnya',
+];
 
 export default function EditTransaksi() {
   const router = useRouter();
   const params = useLocalSearchParams();
-
-  // ==== FIX PARAMS NEED STRING ====
   const idRaw = params.id;
   const idValue = Array.isArray(idRaw) ? idRaw[0] : idRaw;
 
   const db = openDatabase();
 
   const [loading, setLoading] = useState(true);
-  const [rekening, setRekening] = useState('');
-  const [jenis, setJenis] = useState<'income' | 'expense'>('income');
-  const [kategori, setKategori] = useState('');
+  const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
+  const [tanggalObj, setTanggalObj] = useState<Date>(new Date());
+  const [jamObj, setJamObj] = useState<Date>(new Date());
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
+
   const [jumlah, setJumlah] = useState('');
-  const [tanggal, setTanggal] = useState('');
-  const [jam, setJam] = useState('');
+  const [kategoriDipilih, setKategoriDipilih] = useState('');
+  const [kategoriBaru, setKategoriBaru] = useState('');
+  const [kategoriList, setKategoriList] = useState<string[]>([
+    'Gaji', 'Bonus', 'Penjualan', 'Investasi',
+  ]);
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [jenis, setJenis] = useState<'income' | 'expense'>('income');
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const data: TransaksiRow[] = await getAllTransactions(db);
-    const trx = data.find(t => String(t.id) === String(idValue));
+    setLoading(true);
+    try {
+      const data: TransaksiRow[] = await getAllTransactions(db);
+      const trx = data.find((t) => String(t.id) === String(idValue));
 
-    if (trx) {
-      setRekening(trx.rekening);
-      setJenis(trx.jenis);
-      setTanggal(trx.tanggal);
-      setJam(trx.jam);
+      if (trx) {
+        setRekeningDipilih(trx.rekening || null);
+        setJenis(trx.jenis || 'income');
 
-      // cari kategori
-      const kategoriKeys = Object.keys(trx).filter(
-        k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
-      );
+        if (trx.tanggal) {
+          const [y, m, d] = trx.tanggal.split('-').map(Number);
+          setTanggalObj(new Date(y, m - 1, d));
+        }
 
-      const foundKategori = kategoriKeys.find(k => Number(trx[k]) > 0);
+        if (trx.jam) {
+          const [hh, mm] = trx.jam.split(':').map(Number);
+          const t = new Date();
+          t.setHours(hh);
+          t.setMinutes(mm);
+          setJamObj(t);
+        }
 
-      if (foundKategori) {
-        setKategori(foundKategori.replace(/_/g, ' '));
-        setJumlah(String(trx[foundKategori]));
+        const kategoriKeys = Object.keys(trx).filter(
+          (k) => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
+        );
+        const foundKategori = kategoriKeys.find((k) => Number(trx[k]) > 0);
+
+        if (foundKategori) {
+          setKategoriDipilih(foundKategori.replace(/_/g, ' '));
+          setJumlah(String(trx[foundKategori]));
+        }
       }
+    } catch (e) {
+      console.error('Gagal load edit data:', e);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setLoading(false);
+  const formatTanggalIndonesia = (date: Date) => {
+    const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const bulanList = [
+      'Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'
+    ];
+    return `${hariList[date.getDay()]}, ${date.getDate()} ${bulanList[date.getMonth()]} ${date.getFullYear()}`;
+  };
+
+  const formatRibuan = (value: string) => {
+    const numberString = value.replace(/\./g, '').replace(/[^0-9]/g, '');
+    if (!numberString) return '';
+    return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+
+  const showPickerHandler = (mode: 'date' | 'time') => {
+    setPickerMode(mode);
+    setShowPicker(true);
+  };
+
+  const pilihRekening = (item: string) => {
+    setRekeningDipilih(item);
+    setModalVisible(false);
+  };
+
+  const pilihDariDropdown = (item: string) => {
+    setRekeningDipilih(item);
+    setDropdownVisible(false);
+  };
+
+  const pilihKategori = (item: string) => setKategoriDipilih(item);
+
+  const handleTambahKategori = () => {
+    const nama = kategoriBaru.trim();
+    if (nama !== '' && !kategoriList.includes(nama)) {
+      setKategoriList([...kategoriList, nama]);
+      setKategoriDipilih(nama);
+      setKategoriBaru('');
+      Keyboard.dismiss();
+    }
   };
 
   const saveEdit = async () => {
-    if (!kategori || !jumlah) return;
+    if (!kategoriDipilih || !jumlah) {
+      Alert.alert('Peringatan', 'Lengkapi kategori dan jumlah terlebih dahulu.');
+      return;
+    }
 
-    // pastikan kategori bersih
-    const kategoriFix = Array.isArray(kategori) ? kategori[0] : kategori;
-    const cleanKategori = kategoriFix.replace(/\s+/g, '_');
+    try {
+      const cleanKategori = kategoriDipilih.replace(/\s+/g, '_');
+      await ensureCategoryColumn(db, cleanKategori);
 
-    // buat kolom jika belum ada
-    await ensureCategoryColumn(db, cleanKategori);
+      const tgl = `${tanggalObj.getFullYear()}-${(tanggalObj.getMonth()+1).toString().padStart(2,'0')}-${tanggalObj.getDate().toString().padStart(2,'0')}`;
+      const hh = jamObj.getHours().toString().padStart(2, '0');
+      const mm = jamObj.getMinutes().toString().padStart(2, '0');
+      const jamStr = `${hh}:${mm}`;
 
-    // UPDATE (format diperbaiki total)
-    await db.runAsync(
-      `
-      UPDATE transaksi
-      SET tanggal = ?, 
-          jam = ?, 
-          rekening = ?, 
-          jenis = ?, 
-          ${cleanKategori} = ?
-      WHERE id = ?
-    `,
+      await db.runAsync(
+        `
+        UPDATE transaksi
+        SET tanggal = ?, jam = ?, rekening = ?, jenis = ?, ${cleanKategori} = ?
+        WHERE id = ?
+      `,
+        [
+          tgl,
+          jamStr,
+          rekeningDipilih,
+          jenis,
+          Number(jumlah.replace(/\./g, '')),
+          Number(idValue),
+        ]
+      );
+
+      Alert.alert('Sukses', 'Transaksi berhasil diperbarui.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err) {
+      console.error('Gagal menyimpan edit:', err);
+      Alert.alert('Error', 'Gagal menyimpan perubahan.');
+    }
+  };
+
+  // === LOGIKA HAPUS DENGAN KONFIRMASI ===
+  const hapusTransaksi = () => {
+    Alert.alert(
+      'Konfirmasi Hapus',
+      'Apakah Anda yakin ingin menghapus transaksi ini?',
       [
-        tanggal,
-        jam,
-        rekening,
-        jenis,
-        Number(jumlah),
-        Number(idValue),
+        { text: 'Tidak', style: 'cancel' },
+        { text: 'Ya', style: 'destructive', onPress: async () => {
+            try {
+              await db.runAsync(`DELETE FROM transaksi WHERE id = ?`, [Number(idValue)]);
+              Alert.alert('Sukses', 'Transaksi berhasil dihapus.', [
+                { text: 'OK', onPress: () => router.back() },
+              ]);
+            } catch (err) {
+              console.error('Gagal menghapus transaksi:', err);
+              Alert.alert('Error', 'Gagal menghapus transaksi.');
+            }
+          } 
+        }
       ]
     );
-
-    router.back();
   };
 
   if (loading) {
@@ -117,101 +218,186 @@ export default function EditTransaksi() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Edit Transaksi</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      {/* Modal Pilih Rekening */}
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.header}>Pilih Rekening</Text>
+            <View style={styles.grid}>
+              {LIST_REKENING.map((item) => (
+                <TouchableOpacity key={item} style={styles.rekeningButton} onPress={() => pilihRekening(item)}>
+                  <Text style={styles.rekeningText}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
-      <Text style={styles.label}>Rekening</Text>
-      <TextInput style={styles.input} value={rekening} onChangeText={setRekening} />
-
-      <Text style={styles.label}>Jenis</Text>
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={[
-            styles.typeButton,
-            jenis === 'income' && styles.typeActiveIncome,
-          ]}
-          onPress={() => setJenis('income')}
-        >
-          <Text style={styles.typeText}>Pemasukan</Text>
+      {/* Header */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.typeButton,
-            jenis === 'expense' && styles.typeActiveExpense,
-          ]}
-          onPress={() => setJenis('expense')}
-        >
-          <Text style={styles.typeText}>Pengeluaran</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Transaksi</Text>
       </View>
 
-      <Text style={styles.label}>Kategori</Text>
-      <TextInput style={styles.input} value={kategori} onChangeText={setKategori} />
+      <ScrollView contentContainerStyle={styles.formContainer}>
+        {/* Jenis Toggle */}
+        <View style={styles.switchContainer}>
+          <TouchableOpacity
+            style={[styles.switchBtn, jenis === 'expense' && styles.switchActive]}
+            onPress={() => setJenis('expense')}
+          >
+            <Text style={[styles.switchText, jenis === 'expense' && styles.switchTextActive]}>Pengeluaran</Text>
+          </TouchableOpacity>
 
-      <Text style={styles.label}>Jumlah</Text>
-      <TextInput
-        style={styles.input}
-        value={jumlah}
-        keyboardType="numeric"
-        onChangeText={setJumlah}
-      />
+          <TouchableOpacity
+            style={[styles.switchBtn, jenis === 'income' && styles.switchActive]}
+            onPress={() => setJenis('income')}
+          >
+            <Text style={[styles.switchText, jenis === 'income' && styles.switchTextActive]}>Pemasukan</Text>
+          </TouchableOpacity>
+        </View>
 
-      <Text style={styles.label}>Tanggal</Text>
-      <TextInput style={styles.input} value={tanggal} onChangeText={setTanggal} />
+        {/* Tanggal & Waktu */}
+        <View style={styles.row}>
+          <TouchableOpacity style={styles.dateButton} onPress={() => showPickerHandler('date')}>
+            <Text>{formatTanggalIndonesia(tanggalObj)}</Text>
+            <Ionicons name="calendar-outline" size={20} />
+          </TouchableOpacity>
 
-      <Text style={styles.label}>Jam</Text>
-      <TextInput style={styles.input} value={jam} onChangeText={setJam} />
+          <TouchableOpacity style={styles.timeButton} onPress={() => showPickerHandler('time')}>
+            <Text>{jamObj.getHours().toString().padStart(2,'0')}:{jamObj.getMinutes().toString().padStart(2,'0')}</Text>
+          </TouchableOpacity>
+        </View>
 
-      <TouchableOpacity style={styles.saveButton} onPress={saveEdit}>
-        <Text style={styles.saveText}>Simpan Perubahan</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <DateTimePickerModal
+          isVisible={showPicker}
+          mode={pickerMode || 'date'}
+          date={pickerMode === 'date' ? tanggalObj : jamObj}
+          is24Hour
+          display={pickerMode === 'date' ? (Platform.OS === 'ios' ? 'inline' : 'calendar') : (Platform.OS === 'ios' ? 'spinner' : 'clock')}
+          onConfirm={(selectedDate) => {
+            if (pickerMode === 'date') setTanggalObj(selectedDate);
+            else setJamObj(selectedDate);
+            setShowPicker(false);
+            setPickerMode(null);
+          }}
+          onCancel={() => { setShowPicker(false); setPickerMode(null); }}
+        />
+
+        {/* Dropdown Rekening */}
+        <View style={styles.dropdownContainer}>
+          <TouchableOpacity style={styles.dropdownButton} onPress={() => setDropdownVisible(!dropdownVisible)}>
+            <Text style={{ color: rekeningDipilih ? '#000' : '#999' }}>
+              {rekeningDipilih || 'Pilih Rekening'}
+            </Text>
+            <Ionicons name={dropdownVisible ? 'chevron-up' : 'chevron-down'} size={20} />
+          </TouchableOpacity>
+
+          {dropdownVisible && (
+            <View style={styles.dropdownList}>
+              <FlatList
+                data={LIST_REKENING}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={styles.dropdownItem} onPress={() => pilihDariDropdown(item)}>
+                    <Text style={styles.dropdownText}>{item}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* Jumlah */}
+        <TextInput
+          style={styles.input}
+          placeholder="Jumlah"
+          keyboardType="numeric"
+          value={formatRibuan(jumlah)}
+          onChangeText={(text) => setJumlah(formatRibuan(text))}
+        />
+
+        {/* Kategori */}
+        <TextInput
+          style={styles.input}
+          placeholder="Kategori yang Dipilih"
+          value={kategoriDipilih}
+          onChangeText={setKategoriDipilih}
+        />
+
+        {/* Pilihan kategori */}
+        <View style={styles.kategoriContainer}>
+          {kategoriList.map((item) => (
+            <TouchableOpacity key={item} style={styles.kategoriButton} onPress={() => pilihKategori(item)}>
+              <Text style={styles.kategoriText}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Tambah kategori baru */}
+        <TextInput
+          style={styles.input}
+          placeholder="Tambah Kategori Baru"
+          value={kategoriBaru}
+          onChangeText={setKategoriBaru}
+          onSubmitEditing={handleTambahKategori}
+        />
+
+        {/* Tombol Simpan & Hapus */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+          <TouchableOpacity style={[styles.simpanButton, { backgroundColor: '#E53935' }]} onPress={hapusTransaksi}>
+            <Text style={styles.simpanText}>Hapus</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.simpanButton} onPress={saveEdit}>
+            <Text style={styles.simpanText}>Simpan</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-// =========================
-// STYLES
-// =========================
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 20, color: '#00A86B' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContainer: { backgroundColor: '#fff', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
 
-  label: { marginTop: 15, color: '#333' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 5,
-  },
+  topHeader: { backgroundColor: '#00A86B', paddingTop: 50, paddingBottom: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, flexDirection: 'row', alignItems: 'center' },
+  backButton: { position: 'absolute', left: 20, top: 50, zIndex: 10 },
+  headerTitle: { flex: 1, textAlign: 'center', color: '#fff', fontSize: 20, fontWeight: '600' },
 
-  row: { flexDirection: 'row', marginTop: 10, gap: 10 },
-  typeButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    alignItems: 'center',
-  },
-  typeText: { color: '#000' },
+  formContainer: { paddingHorizontal: 20, paddingVertical: 25 },
+  header: { fontSize: 20, fontWeight: 'bold', color: '#007E33', marginBottom: 20, textAlign: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+  rekeningButton: { backgroundColor: '#E9E9E9', paddingVertical: 15, paddingHorizontal: 25, borderRadius: 10, margin: 5 },
+  rekeningText: { fontSize: 16, fontWeight: '600' },
 
-  typeActiveIncome: {
-    backgroundColor: '#00A86B',
-    borderColor: '#00A86B',
-  },
-  typeActiveExpense: {
-    backgroundColor: '#D83A56',
-    borderColor: '#D83A56',
-  },
+  switchContainer: { flexDirection: 'row', backgroundColor: '#d9d9d9', padding: 5, borderRadius: 50, marginBottom: 20 },
+  switchBtn: { flex: 1, paddingVertical: 10, borderRadius: 50, alignItems: 'center' },
+  switchActive: { backgroundColor: '#02a652' },
+  switchText: { color: '#555', fontSize: 14 },
+  switchTextActive: { color: '#fff', fontWeight: '700' },
 
-  saveButton: {
-    backgroundColor: '#00A86B',
-    padding: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 30,
-  },
-  saveText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  dateButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFEFEF', padding: 10, borderRadius: 8, flex: 0.65, justifyContent: 'space-between' },
+  timeButton: { backgroundColor: '#EFEFEF', padding: 10, borderRadius: 8, flex: 0.3, alignItems: 'center' },
+
+  input: { width: '100%', backgroundColor: '#EFEFEF', padding: 12, borderRadius: 8, marginBottom: 15 },
+
+  dropdownContainer: { position: 'relative', width: '100%', marginBottom: 15 },
+  dropdownButton: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#EFEFEF', padding: 12, borderRadius: 8, alignItems: 'center' },
+  dropdownList: { backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#ccc', marginTop: 5, elevation: 4, maxHeight: 200 },
+  dropdownItem: { paddingVertical: 12, paddingHorizontal: 15 },
+  dropdownText: { fontSize: 16 },
+
+  kategoriContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginVertical: 10 },
+  kategoriButton: { backgroundColor: '#00A86B', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
+  kategoriText: { color: '#fff' },
+
+  simpanButton: { backgroundColor: '#00A86B', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8 },
+  simpanText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
