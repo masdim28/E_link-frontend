@@ -50,7 +50,7 @@ export default function EditTransaksi() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
 
-  const [jumlah, setJumlah] = useState('');
+  const [jumlah, setJumlah] = useState<number | null>(null);
   const [kategoriDipilih, setKategoriDipilih] = useState('');
   const [kategoriBaru, setKategoriBaru] = useState('');
   const [kategoriList, setKategoriList] = useState<string[]>([
@@ -60,6 +60,8 @@ export default function EditTransaksi() {
   const [modalVisible, setModalVisible] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [jenis, setJenis] = useState<'income' | 'expense'>('income');
+
+  const [originalKategori, setOriginalKategori] = useState(''); // Simpan kategori asli dari DB
 
   useEffect(() => {
     loadData();
@@ -94,8 +96,10 @@ export default function EditTransaksi() {
         const foundKategori = kategoriKeys.find((k) => Number(trx[k]) > 0);
 
         if (foundKategori) {
-          setKategoriDipilih(foundKategori.replace(/_/g, ' '));
-          setJumlah(String(trx[foundKategori]));
+          const kategoriFormatted = foundKategori.replace(/_/g, ' ');
+          setKategoriDipilih(kategoriFormatted);
+          setOriginalKategori(kategoriFormatted);
+          setJumlah(Number(trx[foundKategori]));
         }
       }
     } catch (e) {
@@ -113,10 +117,9 @@ export default function EditTransaksi() {
     return `${hariList[date.getDay()]}, ${date.getDate()} ${bulanList[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-  const formatRibuan = (value: string) => {
-    const numberString = value.replace(/\./g, '').replace(/[^0-9]/g, '');
-    if (!numberString) return '';
-    return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const formatRibuan = (value: number | null) => {
+    if (value === null) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
   const showPickerHandler = (mode: 'date' | 'time') => {
@@ -134,7 +137,9 @@ export default function EditTransaksi() {
     setDropdownVisible(false);
   };
 
-  const pilihKategori = (item: string) => setKategoriDipilih(item);
+  const pilihKategori = (item: string) => {
+    setKategoriDipilih(item); // Jangan ubah jumlah saat ganti kategori
+  };
 
   const handleTambahKategori = () => {
     const nama = kategoriBaru.trim();
@@ -147,7 +152,7 @@ export default function EditTransaksi() {
   };
 
   const saveEdit = async () => {
-    if (!kategoriDipilih || !jumlah) {
+    if (!kategoriDipilih || jumlah === null) {
       Alert.alert('Peringatan', 'Lengkapi kategori dan jumlah terlebih dahulu.');
       return;
     }
@@ -161,20 +166,23 @@ export default function EditTransaksi() {
       const mm = jamObj.getMinutes().toString().padStart(2, '0');
       const jamStr = `${hh}:${mm}`;
 
+      let sqlUpdate = '';
+      const params: any[] = [tgl, jamStr, rekeningDipilih, jenis];
+
+      if (originalKategori && originalKategori !== kategoriDipilih) {
+        const oldClean = originalKategori.replace(/\s+/g, '_');
+        sqlUpdate = `${oldClean} = 0, ${cleanKategori} = ?`;
+      } else {
+        sqlUpdate = `${cleanKategori} = ?`;
+      }
+
+      params.push(jumlah, Number(idValue));
+
       await db.runAsync(
-        `
-        UPDATE transaksi
-        SET tanggal = ?, jam = ?, rekening = ?, jenis = ?, ${cleanKategori} = ?
-        WHERE id = ?
-      `,
-        [
-          tgl,
-          jamStr,
-          rekeningDipilih,
-          jenis,
-          Number(jumlah.replace(/\./g, '')),
-          Number(idValue),
-        ]
+        `UPDATE transaksi
+         SET tanggal = ?, jam = ?, rekening = ?, jenis = ?, ${sqlUpdate}
+         WHERE id = ?`,
+        params
       );
 
       Alert.alert('Sukses', 'Transaksi berhasil diperbarui.', [
@@ -186,7 +194,6 @@ export default function EditTransaksi() {
     }
   };
 
-  // === LOGIKA HAPUS DENGAN KONFIRMASI ===
   const hapusTransaksi = () => {
     Alert.alert(
       'Konfirmasi Hapus',
@@ -219,7 +226,6 @@ export default function EditTransaksi() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Modal Pilih Rekening */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modalContainer}>
@@ -235,7 +241,6 @@ export default function EditTransaksi() {
         </View>
       </Modal>
 
-      {/* Header */}
       <View style={styles.topHeader}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -244,7 +249,6 @@ export default function EditTransaksi() {
       </View>
 
       <ScrollView contentContainerStyle={styles.formContainer}>
-        {/* Jenis Toggle */}
         <View style={styles.switchContainer}>
           <TouchableOpacity
             style={[styles.switchBtn, jenis === 'expense' && styles.switchActive]}
@@ -261,7 +265,6 @@ export default function EditTransaksi() {
           </TouchableOpacity>
         </View>
 
-        {/* Tanggal & Waktu */}
         <View style={styles.row}>
           <TouchableOpacity style={styles.dateButton} onPress={() => showPickerHandler('date')}>
             <Text>{formatTanggalIndonesia(tanggalObj)}</Text>
@@ -288,7 +291,6 @@ export default function EditTransaksi() {
           onCancel={() => { setShowPicker(false); setPickerMode(null); }}
         />
 
-        {/* Dropdown Rekening */}
         <View style={styles.dropdownContainer}>
           <TouchableOpacity style={styles.dropdownButton} onPress={() => setDropdownVisible(!dropdownVisible)}>
             <Text style={{ color: rekeningDipilih ? '#000' : '#999' }}>
@@ -312,16 +314,17 @@ export default function EditTransaksi() {
           )}
         </View>
 
-        {/* Jumlah */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
           keyboardType="numeric"
           value={formatRibuan(jumlah)}
-          onChangeText={(text) => setJumlah(formatRibuan(text))}
+          onChangeText={(text) => {
+            const numberOnly = Number(text.replace(/\./g, '')) || 0;
+            setJumlah(numberOnly);
+          }}
         />
 
-        {/* Kategori */}
         <TextInput
           style={styles.input}
           placeholder="Kategori yang Dipilih"
@@ -329,7 +332,6 @@ export default function EditTransaksi() {
           onChangeText={setKategoriDipilih}
         />
 
-        {/* Pilihan kategori */}
         <View style={styles.kategoriContainer}>
           {kategoriList.map((item) => (
             <TouchableOpacity key={item} style={styles.kategoriButton} onPress={() => pilihKategori(item)}>
@@ -338,7 +340,6 @@ export default function EditTransaksi() {
           ))}
         </View>
 
-        {/* Tambah kategori baru */}
         <TextInput
           style={styles.input}
           placeholder="Tambah Kategori Baru"
@@ -347,7 +348,6 @@ export default function EditTransaksi() {
           onSubmitEditing={handleTambahKategori}
         />
 
-        {/* Tombol Simpan & Hapus */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
           <TouchableOpacity style={[styles.simpanButton, { backgroundColor: '#E53935' }]} onPress={hapusTransaksi}>
             <Text style={styles.simpanText}>Hapus</Text>
