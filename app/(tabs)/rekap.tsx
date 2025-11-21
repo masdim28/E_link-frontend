@@ -41,7 +41,8 @@ export default function RekapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
+      {/* Header baru seperti di RekeningScreen */}
       <View style={styles.header}>
         <Text style={styles.headerText}>Rekap</Text>
       </View>
@@ -63,19 +64,21 @@ export default function RekapScreen() {
       {/* Judul Bulan / Tahun */}
       <Text style={styles.monthText}>{isBulanan ? 'Maret 2025' : 'Tahun 2025'}</Text>
 
-      {/* Pie Chart */}
-      <PieChart
-        data={chartData}
-        width={screenWidth}
-        height={200}
-        chartConfig={{
-          color: () => '#000',
-        }}
-        accessor="population"
-        backgroundColor="transparent"
-        paddingLeft="10"
-        hasLegend={false}
-      />
+      {/* Pie Chart DI TENGAH + DIPERBESAR */}
+      <View style={styles.chartWrapper}>
+        <PieChart
+          data={chartData}
+          width={screenWidth * 0.85}   // sedikit lebih kecil agar center pas
+          height={260}                // diperbesar
+          chartConfig={{
+            color: () => '#000',
+          }}
+          accessor="population"
+          backgroundColor="transparent"
+          paddingLeft="85"
+          hasLegend={false}
+        />
+      </View>
 
       {/* Daftar Kategori */}
       <ScrollView style={styles.listContainer}>
@@ -89,18 +92,31 @@ export default function RekapScreen() {
           </View>
         ))}
       </ScrollView>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+
+  // HEADER BARU
   header: {
     backgroundColor: '#00A86B',
-    paddingVertical: 14,
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     alignItems: 'center',
   },
-  headerText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  headerText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+
+  // SWITCH
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -116,12 +132,21 @@ const styles = StyleSheet.create({
   switchActive: { backgroundColor: '#00A86B' },
   switchText: { color: '#fff', fontSize: 14 },
   switchTextActive: { color: '#fff', fontWeight: '600' },
+
   monthText: {
     textAlign: 'center',
     marginVertical: 10,
     fontSize: 16,
     fontWeight: '500',
   },
+
+  // PIE CHART CENTER
+  chartWrapper: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+
+  // LIST
   listContainer: { marginTop: 10, paddingHorizontal: 20 },
   listItem: {
     flexDirection: 'row',

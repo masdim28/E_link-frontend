@@ -61,7 +61,7 @@ export default function EditTransaksi() {
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [jenis, setJenis] = useState<'income' | 'expense'>('income');
 
-  const [originalKategori, setOriginalKategori] = useState(''); // Simpan kategori asli dari DB
+  const [originalKategori, setOriginalKategori] = useState('');
 
   useEffect(() => {
     loadData();
@@ -117,9 +117,11 @@ export default function EditTransaksi() {
     return `${hariList[date.getDay()]}, ${date.getDate()} ${bulanList[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-  const formatRibuan = (value: number | null) => {
-    if (value === null) return '';
-    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  // === FORMAT RIBUAN BARU ===
+  const formatRupiahEdit = (value: string) => {
+    const numberString = value.replace(/\D/g, '');
+    if (!numberString) return '';
+    return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
   const showPickerHandler = (mode: 'date' | 'time') => {
@@ -138,7 +140,7 @@ export default function EditTransaksi() {
   };
 
   const pilihKategori = (item: string) => {
-    setKategoriDipilih(item); // Jangan ubah jumlah saat ganti kategori
+    setKategoriDipilih(item);
   };
 
   const handleTambahKategori = () => {
@@ -242,9 +244,27 @@ export default function EditTransaksi() {
       </Modal>
 
       <View style={styles.topHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        
+        {/* === TOMBOL BACK DENGAN POP UP PERINGATAN === */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => {
+            Alert.alert(
+              "Konfirmasi",
+              "Apakah kamu ingin meninggalkan halaman ini?",
+              [
+                { text: "Tidak", style: "cancel" },
+                {
+                  text: "Iya",
+                  onPress: () => router.back(),
+                },
+              ]
+            );
+          }}
+        >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
+
         <Text style={styles.headerTitle}>Edit Transaksi</Text>
       </View>
 
@@ -314,14 +334,16 @@ export default function EditTransaksi() {
           )}
         </View>
 
+        {/* === INPUT JUMLAH BARU === */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
           keyboardType="numeric"
-          value={formatRibuan(jumlah)}
+          value={jumlah !== null ? formatRupiahEdit(jumlah.toString()) : ''}
           onChangeText={(text) => {
-            const numberOnly = Number(text.replace(/\./g, '')) || 0;
-            setJumlah(numberOnly);
+            const clean = text.replace(/\D/g, '');
+            if (clean === '') setJumlah(null);
+            else setJumlah(Number(clean));
           }}
         />
 

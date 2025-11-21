@@ -122,19 +122,20 @@ export default function TambahPengeluaran() {
     return `${hari}, ${tanggal} ${bulan} ${tahun}`;
   };
 
-  // ================================
-  //  ✅ Format Ribuan (Tidak Ubah UI)
-  // ================================
   const formatRupiah = (value: string) => {
     const numberString = value.replace(/\D/g, '');
     return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
-  // ================================
-  //  SIMPAN KE DATABASE
-  // ================================
   const handleSimpan = async () => {
-    if (!rekeningDipilih || !kategoriDipilih || !jumlah) {
+    const angkaBersih = jumlah.replace(/\./g, '').trim();
+
+    if (!angkaBersih || isNaN(Number(angkaBersih)) || Number(angkaBersih) <= 0) {
+      Alert.alert('Jumlah Tidak Valid', 'Masukkan nominal yang benar.');
+      return;
+    }
+
+    if (!rekeningDipilih || !kategoriDipilih) {
       Alert.alert('Peringatan', 'Harap lengkapi semua data sebelum menyimpan.');
       return;
     }
@@ -146,7 +147,7 @@ export default function TambahPengeluaran() {
         rekening: rekeningDipilih,
         jenis: 'expense',
         kategori: kategoriDipilih,
-        jumlah: parseFloat(jumlah.replace(/\./g, '')), // penting
+        jumlah: Number(angkaBersih),
       });
 
       Alert.alert('Berhasil', 'Transaksi pengeluaran berhasil disimpan.');
@@ -159,7 +160,7 @@ export default function TambahPengeluaran() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Modal Pilih Rekening Awal */}
+      {/* Modal Pilih Rekening */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modalContainer}>
@@ -183,16 +184,28 @@ export default function TambahPengeluaran() {
       <View style={styles.topHeader}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            Alert.alert(
+              'Konfirmasi',
+              'Apakah kamu ingin meninggalkan halaman ini?',
+              [
+                { text: 'Tidak', style: 'cancel' },
+                {
+                  text: 'Iya',
+                  onPress: () => navigation.goBack(),
+                },
+              ]
+            );
+          }}
         >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
+
         <Text style={styles.headerTitle}>Tambah Pengeluaran</Text>
       </View>
 
       {/* Form */}
       <ScrollView contentContainerStyle={styles.formContainer}>
-        {/* Baris tanggal & waktu */}
         <View style={styles.row}>
           <TouchableOpacity
             style={styles.dateButton}
@@ -201,6 +214,7 @@ export default function TambahPengeluaran() {
             <Text>{formatTanggalIndonesia(tanggal)}</Text>
             <Ionicons name="calendar-outline" size={20} />
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.timeButton}
             onPress={() => setShowTimePicker(true)}
@@ -230,7 +244,7 @@ export default function TambahPengeluaran() {
           />
         )}
 
-        {/* Dropdown Rekening */}
+        {/* Rekening Dropdown */}
         <View style={styles.dropdownContainer}>
           <TouchableOpacity
             style={styles.dropdownButton}
@@ -245,6 +259,7 @@ export default function TambahPengeluaran() {
               color="#000"
             />
           </TouchableOpacity>
+
           {dropdownVisible && (
             <View style={styles.dropdownList}>
               <FlatList
@@ -263,9 +278,7 @@ export default function TambahPengeluaran() {
           )}
         </View>
 
-        {/* ======================================= */}
-        {/*         INPUT JUMLAH (diformat)         */}
-        {/* ======================================= */}
+        {/* Input Jumlah */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
@@ -274,16 +287,13 @@ export default function TambahPengeluaran() {
           onChangeText={(text) => setJumlah(formatRupiah(text))}
         />
 
-        {/* Kategori Dipilih */}
         <TextInput
           style={styles.input}
           placeholder="Kategori yang Dipilih"
           value={kategoriDipilih}
           onChangeText={setKategoriDipilih}
-          editable={true}
         />
 
-        {/* Tombol Kategori */}
         <View style={styles.kategoriContainer}>
           {kategoriList.map((item) => (
             <TouchableOpacity
@@ -296,7 +306,6 @@ export default function TambahPengeluaran() {
           ))}
         </View>
 
-        {/* Tambah Kategori Baru */}
         <TextInput
           style={styles.input}
           placeholder="Tambah Kategori Baru"
@@ -305,7 +314,6 @@ export default function TambahPengeluaran() {
           onSubmitEditing={handleSubmitEditing}
         />
 
-        {/* Tombol Simpan */}
         <TouchableOpacity style={styles.simpanButton} onPress={handleSimpan}>
           <Text style={styles.simpanText}>Simpan</Text>
         </TouchableOpacity>
@@ -315,7 +323,11 @@ export default function TambahPengeluaran() {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
   modalContainer: {
     backgroundColor: '#fff',
     padding: 20,
@@ -331,14 +343,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  backButton: { position: 'absolute', left: 20, top: 50, zIndex: 10 },
-  headerTitle: { flex: 1, textAlign: 'center', color: '#fff', fontSize: 20, fontWeight: '600' },
-  formContainer: { paddingHorizontal: 20, paddingVertical: 25 },
-  header: { fontSize: 20, fontWeight: 'bold', color: '#007E33', marginBottom: 20, textAlign: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
-  rekeningButton: { backgroundColor: '#E9E9E9', paddingVertical: 15, paddingHorizontal: 25, borderRadius: 10, margin: 5 },
-  rekeningText: { fontSize: 16, fontWeight: '600' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 50,
+    zIndex: 10,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  formContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 25,
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007E33',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  rekeningButton: {
+    backgroundColor: '#E9E9E9',
+    paddingVertical: 15,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+    margin: 5,
+  },
+  rekeningText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -355,8 +405,18 @@ const styles = StyleSheet.create({
     flex: 0.3,
     alignItems: 'center',
   },
-  input: { width: '100%', backgroundColor: '#EFEFEF', padding: 12, borderRadius: 8, marginBottom: 15 },
-  dropdownContainer: { position: 'relative', width: '100%', marginBottom: 15 },
+  input: {
+    width: '100%',
+    backgroundColor: '#EFEFEF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  dropdownContainer: {
+    position: 'relative',
+    width: '100%',
+    marginBottom: 15,
+  },
   dropdownButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -374,11 +434,39 @@ const styles = StyleSheet.create({
     elevation: 4,
     maxHeight: 200,
   },
-  dropdownItem: { paddingVertical: 12, paddingHorizontal: 15 },
-  dropdownText: { fontSize: 16 },
-  kategoriContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginVertical: 10 },
-  kategoriButton: { backgroundColor: '#00A86B', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
-  kategoriText: { color: '#fff' },
-  simpanButton: { backgroundColor: '#00A86B', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8, alignSelf: 'flex-end' },
-  simpanText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+  },
+  dropdownText: {
+    fontSize: 16,
+  },
+  kategoriContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginVertical: 10,
+  },
+  kategoriButton: {
+    backgroundColor: '#00A86B',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  kategoriText: {
+    color: '#fff',
+  },
+  simpanButton: {
+    backgroundColor: '#00A86B',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    alignSelf: 'flex-end',
+  },
+  simpanText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

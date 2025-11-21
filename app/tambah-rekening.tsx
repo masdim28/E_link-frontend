@@ -68,20 +68,20 @@ export default function TambahRekeningScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.content}>
-          <Text style={styles.label}>Nama Bank / E-Wallet</Text>
+      
           <TextInput
             style={styles.input}
             value={bank}
             onChangeText={setBank}
-            placeholder="Contoh: BCA, Dana, Cash"
+            placeholder="Nama Rekening"
           />
 
-          <Text style={styles.label}>Saldo Awal (Pemasukan)</Text>
+
           <TextInput
             style={styles.input}
             value={saldoAwal}
             onChangeText={setSaldoAwal}
-            placeholder="Contoh: 1000000"
+            placeholder="Saldo" 
             keyboardType="numeric"
           />
 
@@ -90,7 +90,7 @@ export default function TambahRekeningScreen() {
               onPress={handleSave}
               activeOpacity={0.8}
           >
-            <Text style={styles.saveButtonText}>Simpan Rekening</Text>
+            <Text style={styles.saveButtonText}>Simpan</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -112,13 +112,13 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: 20, 
         borderBottomRightRadius: 20,
     },
-    backButton: {
-        position: 'absolute',
-        left: 16,
-        top: 50,
-        paddingTop: 20,
-        paddingBottom: 20,
-    },
+   backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 34,
+    paddingTop: 20,
+    paddingBottom: 20,
+},
     headerTitle: {
         color: '#fff',
         fontSize: 20,
@@ -134,24 +134,29 @@ const styles = StyleSheet.create({
         marginBottom: 5,
         color: '#333',
     },
-    input: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-    },
-    saveButton: {
-        backgroundColor: '#00A86B',
-        padding: 15,
-        borderRadius: 10,
-        marginTop: 30,
-        alignItems: 'center',
-    },
-    saveButtonText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '700',
-    },
+  input: {
+    backgroundColor: '#E6E6E6',
+    borderWidth: 0,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    marginTop: 5,
+    marginBottom: 12,
+},
+
+
+   saveButton: {
+    backgroundColor: '#00A86B',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+    alignSelf: 'flex-end',   // ➜ tombol ke kanan
+    marginTop: 20,
+},
+saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+},
 });
