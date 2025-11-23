@@ -21,6 +21,10 @@ export default function TambahPemasukan() {
   const navigation = useNavigation();
   const db = openDatabase();
 
+  const [rekeningBaru, setRekeningBaru] = useState('');
+const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
+
+
   const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
   const [tanggal, setTanggal] = useState(new Date());
   const [jam, setJam] = useState(new Date());
@@ -50,15 +54,26 @@ export default function TambahPemasukan() {
     setShowPicker(true);
   };
 
-  const pilihRekening = (item: string) => {
+ const pilihRekening = (item: string) => {
+  if (item === "Lainnya") {
+    setModalVisible(false);
+    setModalRekeningBaru(true);
+  } else {
     setRekeningDipilih(item);
     setModalVisible(false);
-  };
+  }
+};
+
 
   const pilihDariDropdown = (item: string) => {
+  if (item === "Lainnya") {
+    setDropdownVisible(false);
+    setModalRekeningBaru(true);
+  } else {
     setRekeningDipilih(item);
     setDropdownVisible(false);
-  };
+  }
+};
 
   const pilihKategori = (item: string) => {
     setKategoriDipilih(item);
@@ -149,6 +164,39 @@ export default function TambahPemasukan() {
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Modal Pilih Rekening */}
+{/* Modal Input Rekening Baru */}
+<Modal visible={modalRekeningBaru} transparent animationType="fade">
+  <View style={styles.overlay}>
+    <View style={styles.modalContainer}>
+      <Text style={styles.header}>Rekening Baru</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Masukkan nama rekening"
+        value={rekeningBaru}
+        onChangeText={setRekeningBaru}
+      />
+
+      <TouchableOpacity
+        style={styles.simpanButton}
+        onPress={() => {
+          if (rekeningBaru.trim() === '') {
+            Alert.alert("Peringatan", "Nama rekening tidak boleh kosong.");
+            return;
+          }
+
+          setRekeningDipilih(rekeningBaru.trim());
+          setRekeningBaru('');
+          setModalRekeningBaru(false);
+        }}
+      >
+        <Text style={styles.simpanText}>Simpan</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modalContainer}>

@@ -177,28 +177,33 @@ export default function Riwayat() {
           data={tanggalList}
           keyExtractor={(item) => item}
           renderItem={({ item }) => {
+            // === PERHITUNGAN FIX ===
             const income = groupedData[item]
               .filter((x: Transaksi) => x.jenis === "income")
               .reduce((sum: number, t: any) => {
-                const k = Object.keys(t).find(
-                  (key) =>
-                    !["id", "tanggal", "jam", "rekening", "jenis"].includes(
-                      key
-                    ) && t[key] !== 0
+                const keys = Object.keys(t).filter(
+                  (k) =>
+                    !["id", "tanggal", "jam", "rekening", "jenis"].includes(k) &&
+                    typeof t[k] === "number" &&
+                    t[k] !== 0
                 );
-                return sum + (k ? t[k] : 0);
+
+                const totalKategori = keys.reduce((s, k) => s + t[k], 0);
+                return sum + totalKategori;
               }, 0);
 
             const expense = groupedData[item]
               .filter((x: Transaksi) => x.jenis === "expense")
               .reduce((sum: number, t: any) => {
-                const k = Object.keys(t).find(
-                  (key) =>
-                    !["id", "tanggal", "jam", "rekening", "jenis"].includes(
-                      key
-                    ) && t[key] !== 0
+                const keys = Object.keys(t).filter(
+                  (k) =>
+                    !["id", "tanggal", "jam", "rekening", "jenis"].includes(k) &&
+                    typeof t[k] === "number" &&
+                    t[k] !== 0
                 );
-                return sum + (k ? t[k] : 0);
+
+                const totalKategori = keys.reduce((s, k) => s + t[k], 0);
+                return sum + totalKategori;
               }, 0);
 
             return (

@@ -30,7 +30,11 @@ export default function RekeningScreen() {
     setIsLoading(true);
     try {
       const db = openDatabase(); 
-      const rekeningList = await getAllRekening(db);
+      const rekeningListRaw = await getAllRekening(db);
+      
+      // --- Type assertion agar TypeScript tahu ini Rekening[]
+      const rekeningList: Rekening[] = (rekeningListRaw as unknown[]) as Rekening[];
+
       setData(rekeningList);
 
       // Hitung total saldo

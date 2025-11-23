@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -60,7 +61,8 @@ export default function TransaksiScreen() {
 
   const fetchTransactions = async () => {
     setLoading(true);
-    const data = await getAllTransactions(db);
+   const data = (await getAllTransactions(db)) as any as Transaction[];
+
     const filtered = data.filter(item => item.tanggal === selectedDate);
 
     // Ambil kategori yang nilainya > 0
@@ -77,9 +79,12 @@ export default function TransaksiScreen() {
     setLoading(false);
   };
 
-  useEffect(() => {
+  useFocusEffect(
+  React.useCallback(() => {
     fetchTransactions();
-  }, []);
+  }, [selectedDate])
+);
+
 
   useEffect(() => {
     fetchTransactions();

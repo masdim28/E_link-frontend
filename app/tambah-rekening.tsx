@@ -1,162 +1,129 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import {
+  Alert,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+} from "react-native";
 
-// Import fungsi yang diperlukan
-import { insertPemasukan, insertRekening, openDatabase } from "../database/database";
+import { openDatabase, insertRekening, insertPemasukan } from "../database/database";
 
-export default function TambahRekeningScreen() {
+export default function TambahRekening() {
   const router = useRouter();
-  const [bank, setBank] = useState('');
-  const [saldoAwal, setSaldoAwal] = useState('');
+  const [bank, setBank] = useState("");
+  const [saldoAwal, setSaldoAwal] = useState("");
 
   const handleSave = async () => {
-    const jumlah = parseFloat(saldoAwal.replace(/[^0-9]/g, '')); // Bersihkan input dari non-angka
     const cleanBank = bank.trim();
+    const jumlah = parseFloat(saldoAwal.replace(/[^0-9]/g, ""));
 
-    if (!cleanBank || isNaN(jumlah) || jumlah < 0) {
-      Alert.alert("Input Tidak Valid", "Mohon isi nama bank dan saldo awal yang benar.");
+    if (!cleanBank || isNaN(jumlah)) {
+      Alert.alert("Input salah", "Isi nama rekening dan saldo awal dengan benar.");
       return;
     }
 
     try {
       const db = openDatabase();
-      
-      // 1. Simpan Rekening Baru dengan saldo awal
-      await insertRekening(db, { bank: cleanBank, saldo: jumlah });
 
-      // 2. Catat sebagai Transaksi Pemasukan (Saldo Awal)
-      const date = new Date();
-      const tanggal = date.toISOString().split('T')[0];
-      const jam = date.toTimeString().split(' ')[0].substring(0, 5);
-      
+      // 1. Buat rekening baru
+      await insertRekening(db, cleanBank, jumlah);
+
+      // 2. MASUKKAN KE TRANSAKSI sebagai saldo awal
+      const now = new Date();
+      const tanggal = now.toISOString().split("T")[0];
+      const jam = now.toTimeString().substring(0, 5);
+
       await insertPemasukan(db, {
-          tanggal,
-          jam,
-          rekening: cleanBank, 
-          kategori: 'Saldo Awal', // Gunakan kategori khusus
-          jumlah,
+        tanggal,
+        jam,
+        rekening: cleanBank,
+        kategori: "Saldo Awal",
+        jumlah,
       });
 
-      Alert.alert("Berhasil", "Rekening baru berhasil ditambahkan!");
+      Alert.alert("Berhasil", "Rekening berhasil dibuat!");
       router.back();
-
-    } catch (error: any) {
-      console.error("Gagal menyimpan rekening:", error);
-      if (error.message.includes('UNIQUE constraint failed')) {
-         Alert.alert("Gagal", "Nama rekening ini sudah ada.");
-      } else {
-         Alert.alert("Error", "Gagal menyimpan rekening. Silakan coba lagi.");
-      }
+    } catch (e) {
+      console.log(e);
+      Alert.alert("Error", "Gagal menyimpan rekening.");
     }
   };
 
   return (
     <View style={styles.container}>
-      
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </TouchableOpacity>
+
         <Text style={styles.headerTitle}>Tambah Rekening</Text>
       </View>
 
-      <KeyboardAvoidingView 
-        style={{flex: 1}} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
       >
         <View style={styles.content}>
-      
+
           <TextInput
             style={styles.input}
+            placeholder="Nama Rekening"
             value={bank}
             onChangeText={setBank}
-            placeholder="Nama Rekening"
           />
-
 
           <TextInput
             style={styles.input}
+            placeholder="Saldo Awal"
+            keyboardType="numeric"
             value={saldoAwal}
             onChangeText={setSaldoAwal}
-            placeholder="Saldo" 
-            keyboardType="numeric"
           />
 
-          <TouchableOpacity 
-              style={styles.saveButton} 
-              onPress={handleSave}
-              activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>Simpan</Text>
           </TouchableOpacity>
+
         </View>
       </KeyboardAvoidingView>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f9f9f9' },
-    header: {
-        backgroundColor: '#00A86B',
-        paddingTop: 50,
-        paddingBottom: 20,
-        paddingHorizontal: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderBottomLeftRadius: 20, 
-        borderBottomRightRadius: 20,
-    },
-   backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 34,
-    paddingTop: 20,
-    paddingBottom: 20,
-},
-    headerTitle: {
-        color: '#fff',
-        fontSize: 20,
-        fontWeight: '600',
-    },
-    content: {
-        padding: 20,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: '500',
-        marginTop: 15,
-        marginBottom: 5,
-        color: '#333',
-    },
+  container: { flex: 1, backgroundColor: "#f9f9f9" },
+  header: {
+    backgroundColor: "#00A86B",
+    paddingTop: 50,
+    paddingBottom: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  backButton: { position: "absolute", left: 20, top: 46 },
+  headerTitle: { fontSize: 20, fontWeight: "600", color: "#fff" },
+  content: { padding: 20 },
   input: {
-    backgroundColor: '#E6E6E6',
-    borderWidth: 0,
+    backgroundColor: "#E6E6E6",
     borderRadius: 10,
     paddingVertical: 14,
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
     fontSize: 16,
-    marginTop: 5,
-    marginBottom: 12,
-},
-
-
-   saveButton: {
-    backgroundColor: '#00A86B',
+    marginBottom: 14,
+  },
+  saveButton: {
+    backgroundColor: "#00A86B",
     paddingVertical: 12,
-    paddingHorizontal: 25,
+    paddingHorizontal: 24,
     borderRadius: 10,
-    alignSelf: 'flex-end',   // ➜ tombol ke kanan
-    marginTop: 20,
-},
-saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-},
+    alignSelf: "flex-end",
+  },
+  saveButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });
