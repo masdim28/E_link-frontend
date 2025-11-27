@@ -70,7 +70,7 @@ export default function EditTransaksi() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data: TransaksiRow[] = await getAllTransactions(db);
+      const data = (await getAllTransactions(db)) as TransaksiRow[] 
       const trx = data.find((t) => String(t.id) === String(idValue));
 
       if (trx) {
