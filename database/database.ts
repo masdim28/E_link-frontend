@@ -54,6 +54,22 @@ export async function ensureRekeningTable(db: SQLite.SQLiteDatabase) {
   `);
 }
 
+// =============================
+//   CEK NAMA REKENING SUDAH ADA
+// =============================
+export async function isRekeningExists(
+  db: SQLite.SQLiteDatabase,
+  bank: string
+) {
+  const result = await db.getFirstAsync<{ jml: number }>(
+    `SELECT COUNT(*) AS jml FROM rekening WHERE bank = ?;`,
+    [bank]
+  );
+
+  return (result?.jml ?? 0) > 0;
+}
+
+
 // Ambil semua rekening
 export async function getAllRekening(db: SQLite.SQLiteDatabase) {
   return await db.getAllAsync("SELECT * FROM rekening;");
@@ -205,6 +221,34 @@ export async function updateTransaksi(
 export async function getRekeningById(db: SQLite.SQLiteDatabase, id: number) {
   return await db.getFirstAsync(
     `SELECT * FROM rekening WHERE id = ?;`,
+    [id]
+  );
+}
+
+// =============================
+//   UPDATE REKENING (EDIT)
+// =============================
+export async function updateRekening(
+  db: SQLite.SQLiteDatabase,
+  id: number,
+  bank: string,
+  saldo: number
+) {
+  await db.runAsync(
+    `UPDATE rekening SET bank = ?, saldo = ? WHERE id = ?;`,
+    [bank, saldo, id]
+  );
+}
+
+// =============================
+//   DELETE REKENING
+// =============================
+export async function deleteRekening(
+  db: SQLite.SQLiteDatabase,
+  id: number
+) {
+  await db.runAsync(
+    `DELETE FROM rekening WHERE id = ?;`,
     [id]
   );
 }

@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  BackHandler,
   FlatList,
   Keyboard,
   Modal,
@@ -16,19 +15,24 @@ import {
   View,
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { insertTransaction, openDatabase } from '../database/database';
+import { getAllRekening, insertTransaction, openDatabase } from '../database/database';
+
+type RekeningRow = { id: number; bank: string; saldo: number };
 
 export default function TambahPemasukan() {
   const navigation = useNavigation();
-  const db = openDatabase();
 
+  const [db, setDb] = useState<any>(null);
+
+  const [rekeningList, setRekeningList] = useState<RekeningRow[]>([]);
+  const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
   const [rekeningBaru, setRekeningBaru] = useState('');
   const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
+  const [modalVisible, setModalVisible] = useState(true);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
   const [tanggal, setTanggal] = useState(new Date());
   const [jam, setJam] = useState(new Date());
-
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
 
@@ -42,45 +46,30 @@ export default function TambahPemasukan() {
     'Investasi',
   ]);
 
-  const [modalVisible, setModalVisible] = useState(true);
-  const [dropdownVisible, setDropdownVisible] = useState(false);
-
-  const daftarRekening = [
-    'Gopay', 'Dana', 'Mandiri', 'BCA', 'Jago', 'OVO', 'BRI', 'Lainnya', 'Uang Tunai'
-  ];
-
-  // ========== POPUP KONFIRMASI KEMBALI ==========
-  const confirmBack = () => {
-    Alert.alert(
-      "Konfirmasi",
-      "Apakah kamu ingin meninggalkan halaman ini?",
-      [
-        { text: "Tidak", style: "cancel" },
-        { text: "Iya", style: "destructive", onPress: () => navigation.goBack() },
-      ]
-    );
-    return true; // mencegah back default
-  };
-
-  // ========== HARDWARE BACK HANDLER ==========
+  // ================= LOAD REKENING DARI DB =================
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        return confirmBack();
-      }
-    );
+    async function loadDb() {
+      const database = await openDatabase();
+      setDb(database);
 
-    return () => backHandler.remove();
+      const data = await getAllRekening(database) as RekeningRow[];
+
+      // Tambahkan Uang Tunai sebagai pilihan tetap di awal
+      setRekeningList([{ id: 0, bank: 'Uang Tunai', saldo: 0 }, ...data]);
+    }
+
+    loadDb();
   }, []);
 
+  // ================= PICKER =================
   const showPickerHandler = (mode: 'date' | 'time') => {
     setPickerMode(mode);
     setShowPicker(true);
   };
 
+  // ================= PILIH REKENING =================
   const pilihRekening = (item: string) => {
-    if (item === "Lainnya") {
+    if (item === 'Lainnya') {
       setModalVisible(false);
       setModalRekeningBaru(true);
     } else {
@@ -90,7 +79,7 @@ export default function TambahPemasukan() {
   };
 
   const pilihDariDropdown = (item: string) => {
-    if (item === "Lainnya") {
+    if (item === 'Lainnya') {
       setDropdownVisible(false);
       setModalRekeningBaru(true);
     } else {
@@ -99,6 +88,7 @@ export default function TambahPemasukan() {
     }
   };
 
+  // ================= KATEGORI =================
   const pilihKategori = (item: string) => {
     setKategoriDipilih(item);
   };
@@ -117,10 +107,9 @@ export default function TambahPemasukan() {
     handleTambahKategori();
   };
 
+  // ================= FORMAT TANGGAL =================
   const formatTanggalIndonesia = (date: Date) => {
-    const hariList = [
-      'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu',
-    ];
+    const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const bulanList = [
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
@@ -132,50 +121,61 @@ export default function TambahPemasukan() {
     return `${hari}, ${tgl} ${bulan} ${tahun}`;
   };
 
-  // Format Rupiah
+  // ================= FORMAT RUPIAH =================
   const formatRupiah = (value: string) => {
     const numberString = value.replace(/\D/g, '');
     if (!numberString) return '';
     return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
-  // SIMPAN
+  // ================= KONFIRMASI KEMBALI =================
+  const confirmBack = () => {
+    Alert.alert(
+      'Konfirmasi',
+      'Apakah kamu ingin meninggalkan halaman ini?',
+      [
+        { text: 'Tidak', style: 'cancel' },
+        { text: 'Iya', style: 'destructive', onPress: () => navigation.goBack() },
+      ]
+    );
+  };
+
+  // ================= SIMPAN KE DATABASE =================
   const simpanKeDatabase = async () => {
-    const angkaBersih = jumlah.replace(/\./g, "").trim();
+    const angkaBersih = jumlah.replace(/\./g, '').trim();
 
     if (!angkaBersih || isNaN(Number(angkaBersih)) || Number(angkaBersih) <= 0) {
-      Alert.alert("Jumlah Tidak Valid", "Masukkan nominal yang benar.");
+      Alert.alert('Jumlah Tidak Valid', 'Masukkan nominal yang benar.');
       return;
     }
 
     if (!rekeningDipilih || !kategoriDipilih) {
-      Alert.alert("Peringatan", "Harap lengkapi semua data sebelum menyimpan.");
+      Alert.alert('Peringatan', 'Harap lengkapi semua data sebelum menyimpan.');
       return;
     }
 
     try {
+      if (!db) return;
+
       await insertTransaction(db, {
-        tanggal: tanggal.toISOString().split("T")[0],
-        jam: `${jam.getHours().toString().padStart(2, '0')}:${jam.getMinutes()
-          .toString()
-          .padStart(2, '0')}`,
+        tanggal: tanggal.toISOString().split('T')[0],
+        jam: `${jam.getHours().toString().padStart(2, '0')}:${jam.getMinutes().toString().padStart(2, '0')}`,
         rekening: rekeningDipilih,
-        jenis: "income",
+        jenis: 'income',
         kategori: kategoriDipilih,
         jumlah: Number(angkaBersih),
       });
 
-      Alert.alert("Berhasil", "Transaksi pemasukan berhasil disimpan.");
+      Alert.alert('Berhasil', 'Transaksi pemasukan berhasil disimpan.');
       navigation.goBack();
     } catch (error) {
-      console.error("❌ Gagal simpan:", error);
-      Alert.alert("Error", "Terjadi kesalahan saat menyimpan data.");
+      console.error('❌ Gagal simpan:', error);
+      Alert.alert('Error', 'Terjadi kesalahan saat menyimpan data.');
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      
       {/* MODAL REKENING BARU */}
       <Modal visible={modalRekeningBaru} transparent animationType="fade">
         <View style={styles.overlay}>
@@ -193,11 +193,12 @@ export default function TambahPemasukan() {
               style={styles.simpanButton}
               onPress={() => {
                 if (rekeningBaru.trim() === '') {
-                  Alert.alert("Peringatan", "Nama rekening tidak boleh kosong.");
+                  Alert.alert('Peringatan', 'Nama rekening tidak boleh kosong.');
                   return;
                 }
-
                 setRekeningDipilih(rekeningBaru.trim());
+                // Tambahkan ke daftar rekening agar dropdown update
+                setRekeningList(prev => [...prev, { id: prev.length + 1, bank: rekeningBaru.trim(), saldo: 0 }]);
                 setRekeningBaru('');
                 setModalRekeningBaru(false);
               }}
@@ -215,13 +216,13 @@ export default function TambahPemasukan() {
             <Text style={styles.header}>Pilih Rekening</Text>
 
             <View style={styles.grid}>
-              {daftarRekening.map((item) => (
+              {rekeningList.map((item) => (
                 <TouchableOpacity
-                  key={item}
+                  key={item.id}
                   style={styles.rekeningButton}
-                  onPress={() => pilihRekening(item)}
+                  onPress={() => pilihRekening(item.bank)}
                 >
-                  <Text style={styles.rekeningText}>{item}</Text>
+                  <Text style={styles.rekeningText}>{item.bank}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -231,35 +232,23 @@ export default function TambahPemasukan() {
 
       {/* HEADER */}
       <View style={styles.topHeader}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={confirmBack}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={confirmBack}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-
         <Text style={styles.headerTitle}>Tambah Pemasukan</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.formContainer}>
-
-        {/* Tanggal / Jam */}
+        {/* Tanggal & Jam */}
         <View style={styles.row}>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => showPickerHandler("date")}
-          >
+          <TouchableOpacity style={styles.dateButton} onPress={() => showPickerHandler('date')}>
             <Text>{formatTanggalIndonesia(tanggal)}</Text>
             <Ionicons name="calendar-outline" size={20} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.timeButton}
-            onPress={() => showPickerHandler("time")}
-          >
+          <TouchableOpacity style={styles.timeButton} onPress={() => showPickerHandler('time')}>
             <Text>
-              {jam.getHours().toString().padStart(2, '0')}:
-              {jam.getMinutes().toString().padStart(2, '0')}
+              {jam.getHours().toString().padStart(2, '0')}:{jam.getMinutes().toString().padStart(2, '0')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -290,7 +279,7 @@ export default function TambahPemasukan() {
           }}
         />
 
-        {/* Dropdown Rekening */}
+        {/* DROPDOWN REKENING */}
         <View style={styles.dropdownContainer}>
           <TouchableOpacity
             style={styles.dropdownButton}
@@ -299,24 +288,20 @@ export default function TambahPemasukan() {
             <Text style={{ color: rekeningDipilih ? '#000' : '#999' }}>
               {rekeningDipilih || 'Pilih Rekening'}
             </Text>
-
-            <Ionicons
-              name={dropdownVisible ? 'chevron-up' : 'chevron-down'}
-              size={20}
-            />
+            <Ionicons name={dropdownVisible ? 'chevron-up' : 'chevron-down'} size={20} />
           </TouchableOpacity>
 
           {dropdownVisible && (
             <View style={styles.dropdownList}>
               <FlatList
-                data={daftarRekening}
-                keyExtractor={(item) => item}
+                data={rekeningList}
+                keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.dropdownItem}
-                    onPress={() => pilihDariDropdown(item)}
+                    onPress={() => pilihDariDropdown(item.bank)}
                   >
-                    <Text style={styles.dropdownText}>{item}</Text>
+                    <Text style={styles.dropdownText}>{item.bank}</Text>
                   </TouchableOpacity>
                 )}
               />
@@ -324,7 +309,7 @@ export default function TambahPemasukan() {
           )}
         </View>
 
-        {/* Input Jumlah */}
+        {/* JUMLAH */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
@@ -333,7 +318,7 @@ export default function TambahPemasukan() {
           onChangeText={(text) => setJumlah(formatRupiah(text))}
         />
 
-        {/* kategori */}
+        {/* KATEGORI */}
         <TextInput
           style={styles.input}
           placeholder="Kategori yang Dipilih"
@@ -343,17 +328,13 @@ export default function TambahPemasukan() {
 
         <View style={styles.kategoriContainer}>
           {kategoriList.map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={styles.kategoriButton}
-              onPress={() => pilihKategori(item)}
-            >
+            <TouchableOpacity key={item} style={styles.kategoriButton} onPress={() => pilihKategori(item)}>
               <Text style={styles.kategoriText}>{item}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Tambah Kategori */}
+        {/* TAMBAH KATEGORI */}
         <TextInput
           style={styles.input}
           placeholder="Tambah Kategori Baru"
@@ -362,11 +343,8 @@ export default function TambahPemasukan() {
           onSubmitEditing={handleSubmitEditing}
         />
 
-        {/* Tombol Simpan */}
-        <TouchableOpacity
-          style={styles.simpanButton}
-          onPress={simpanKeDatabase}
-        >
+        {/* SIMPAN */}
+        <TouchableOpacity style={styles.simpanButton} onPress={simpanKeDatabase}>
           <Text style={styles.simpanText}>Simpan</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -387,18 +365,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  backButton: {
-    padding: 10,
-    marginLeft: 15,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-    marginRight: 40,
-  },
+  backButton: { padding: 10, marginLeft: 15 },
+  headerTitle: { flex: 1, textAlign: 'center', color: '#fff', fontSize: 20, fontWeight: '600', marginRight: 40 },
 
   formContainer: { paddingHorizontal: 20, paddingVertical: 25 },
   header: { fontSize: 20, fontWeight: 'bold', color: '#007E33', marginBottom: 20, textAlign: 'center' },

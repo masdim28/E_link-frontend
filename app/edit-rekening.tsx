@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -13,52 +13,148 @@ import {
   BackHandler,
 } from "react-native";
 
+import {
+  openDatabase,
+  getRekeningById,
+  isRekeningExists,
+  updateRekening,
+  deleteRekening,
+} from "../database/database";
+
+// ==========================
+// TYPE DATA REKENING
+// ==========================
+type RekeningRow = {
+  id: number;
+  bank: string;
+  saldo: number;
+};
+
 export default function EditRekening() {
   const router = useRouter();
+  const { id } = useLocalSearchParams();
 
-  // STATE FORM
-  const [nama, setNama] = useState("");
+  const [bank, setBank] = useState("");
   const [saldo, setSaldo] = useState("");
 
-  // === POP UP KONFIRMASI BACK ===
+  // ==============================
+  // FORMAT ANGKA -> 1.000 10.500
+  // ==============================
+  const formatNumber = (value: string) => {
+    const clean = value.replace(/\D/g, "");
+    if (!clean) return "";
+    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const handleSaldoChange = (text: string) => {
+    setSaldo(formatNumber(text));
+  };
+
+  // ==============================
+  // LOAD DATA REKENING BY ID
+  // ==============================
+  useEffect(() => {
+    const loadData = async () => {
+      const db = openDatabase();
+
+      const data = (await getRekeningById(
+        db,
+        Number(id)
+      )) as RekeningRow | null;
+
+      if (!data) {
+        Alert.alert("Error", "Rekening tidak ditemukan.");
+        router.back();
+        return;
+      }
+
+      setBank(data.bank);
+      setSaldo(formatNumber(String(data.saldo)));
+    };
+
+    loadData();
+  }, [id]);
+
+  // ==============================
+  // KONFIRMASI KELUAR
+  // ==============================
   const konfirmasiKeluar = () => {
     Alert.alert(
       "Konfirmasi",
       "Apakah kamu ingin meninggalkan halaman ini?",
       [
         { text: "Tidak", style: "cancel" },
-        {
-          text: "Iya",
-          onPress: () => router.back(),
-        },
+        { text: "Iya", onPress: () => router.back() },
       ]
     );
   };
 
-  // === HANDLE BACK HP (ANDROID BACK BUTTON) ===
+  // BUTTON BACK HP
   useEffect(() => {
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
         konfirmasiKeluar();
-        return true; // Mencegah aksi default
+        return true;
       }
     );
 
     return () => backHandler.remove();
   }, []);
 
-  // DUMMY SAVE HANDLER
-  const handleSave = () => {
-    Alert.alert(
-      "Data Disimpan (Dummy)",
-      `Nama Rekening: ${nama}\nSaldo: ${saldo}`
-    );
+  // ==============================
+  // UPDATE DATA REKENING
+  // ==============================
+  const handleSave = async () => {
+    if (!bank.trim()) {
+      Alert.alert("Error", "Nama rekening tidak boleh kosong.");
+      return;
+    }
+
+    const db = openDatabase();
+
+    // cek duplikat rekening (kecuali rekening ini sendiri)
+    const exists = await isRekeningExists(db, bank.trim());
+
+    const nowData = (await getRekeningById(
+      db,
+      Number(id)
+    )) as RekeningRow | null;
+
+    const currentName = nowData?.bank;
+
+    if (exists && bank.trim() !== currentName) {
+      Alert.alert("Nama Sudah Ada", `Rekening "${bank}" sudah digunakan.`);
+      return;
+    }
+
+    const numericSaldo = Number(saldo.replace(/\./g, "")) || 0;
+
+    await updateRekening(db, Number(id), bank.trim(), numericSaldo);
+
+    Alert.alert("Berhasil", "Rekening berhasil diperbarui.", [
+      { text: "OK", onPress: () => router.back() },
+    ]);
   };
 
-  // DUMMY DELETE HANDLER
+  // ==============================
+  // HAPUS REKENING
+  // ==============================
   const handleDelete = () => {
-    Alert.alert("Hapus (Dummy)", "Data rekening dihapus (dummy).");
+    Alert.alert("Hapus Rekening", "Yakin ingin menghapus rekening ini?", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: async () => {
+          const db = openDatabase();
+          await deleteRekening(db, Number(id));
+          Alert.alert("Berhasil", "Rekening dihapus.", [
+            { text: "OK", onPress: () => router.back() },
+          ]);
+        },
+      },
+    ]);
   };
 
   return (
@@ -81,13 +177,12 @@ export default function EditRekening() {
         style={{ flex: 1 }}
       >
         <View style={styles.content}>
-          
           {/* INPUT: Nama Rekening */}
           <TextInput
             style={styles.input}
             placeholder="Nama Rekening"
-            value={nama}
-            onChangeText={setNama}
+            value={bank}
+            onChangeText={setBank}
           />
 
           {/* INPUT: Saldo */}
@@ -95,14 +190,12 @@ export default function EditRekening() {
             style={styles.input}
             placeholder="Saldo Awal"
             value={saldo}
-            onChangeText={setSaldo}
+            onChangeText={handleSaldoChange}
             keyboardType="numeric"
           />
 
-          {/* BUTTON WRAPPER RIGHT */}
+          {/* BUTTON WRAPPER */}
           <View style={styles.buttonRow}>
-
-            {/* Tombol Hapus */}
             <TouchableOpacity
               style={styles.deleteButton}
               onPress={handleDelete}
@@ -110,16 +203,13 @@ export default function EditRekening() {
               <Text style={styles.deleteText}>Hapus</Text>
             </TouchableOpacity>
 
-            {/* Tombol Simpan */}
             <TouchableOpacity
               style={styles.saveButton}
               onPress={handleSave}
             >
               <Text style={styles.saveText}>Simpan</Text>
             </TouchableOpacity>
-
           </View>
-
         </View>
       </KeyboardAvoidingView>
     </View>

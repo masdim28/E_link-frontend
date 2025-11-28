@@ -12,13 +12,30 @@ import {
   StyleSheet,
 } from "react-native";
 
-import { openDatabase, insertRekening, insertPemasukan } from "../database/database";
+import {
+  openDatabase,
+  insertRekening,
+  insertPemasukan,
+  isRekeningExists,
+} from "../database/database";
 
 export default function TambahRekening() {
   const router = useRouter();
   const [bank, setBank] = useState("");
   const [saldoAwal, setSaldoAwal] = useState("");
 
+  // ========= FORMAT SALDO DENGAN TITIK =========
+  const handleSaldoChange = (text: string) => {
+    // Hanya boleh angka
+    const numeric = text.replace(/[^0-9]/g, "");
+
+    // Format titik ribuan
+    const formatted = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+    setSaldoAwal(formatted);
+  };
+
+  // ================ SAVE ====================
   const handleSave = async () => {
     const cleanBank = bank.trim();
     const jumlah = parseFloat(saldoAwal.replace(/[^0-9]/g, ""));
@@ -31,10 +48,18 @@ export default function TambahRekening() {
     try {
       const db = openDatabase();
 
+      // 🔥 CEK NAMA REKENING SUDAH ADA
+      const exists = await isRekeningExists(db, cleanBank);
+
+      if (exists) {
+        Alert.alert("Peringatan", "Nama rekening tersebut sudah ada!");
+        return;
+      }
+
       // 1. Buat rekening baru
       await insertRekening(db, cleanBank, jumlah);
 
-      // 2. MASUKKAN KE TRANSAKSI sebagai saldo awal
+      // 2. Masukkan transaksi saldo awal
       const now = new Date();
       const tanggal = now.toISOString().split("T")[0];
       const jam = now.toTimeString().substring(0, 5);
@@ -70,7 +95,6 @@ export default function TambahRekening() {
         style={{ flex: 1 }}
       >
         <View style={styles.content}>
-
           <TextInput
             style={styles.input}
             placeholder="Nama Rekening"
@@ -83,13 +107,12 @@ export default function TambahRekening() {
             placeholder="Saldo Awal"
             keyboardType="numeric"
             value={saldoAwal}
-            onChangeText={setSaldoAwal}
+            onChangeText={handleSaldoChange}
           />
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Text style={styles.saveButtonText}>Simpan</Text>
           </TouchableOpacity>
-
         </View>
       </KeyboardAvoidingView>
     </View>
