@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+
 import {
   ActivityIndicator,
   Animated,
@@ -186,7 +188,7 @@ export default function TransaksiScreen() {
             onPress={() => router.push('/riwayat')}
             style={{ marginLeft: 20 }}
           >
-            <Ionicons name="document-outline" size={26} color="#fff" />
+            <MaterialIcons name="history" size={30} color="#fff" />
           </TouchableOpacity>
         </View>
 

@@ -94,7 +94,6 @@ const TanggalHeader = ({
           <Text style={styles.tanggalHari}>{d.hari}</Text>
         </View>
 
-        {/* === TOTAL INCOME / EXPENSE / SELISIH === */}
         <View style={styles.totalWrapper}>
           <Text style={[styles.totalAngka, { color: "#00A86B" }]}>
             +{totalIncome.toLocaleString("id-ID")}
@@ -156,13 +155,19 @@ export default function Riwayat() {
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
+
+      {/* ========== HEADER BARU (SAMA DENGAN TambahRekening) ========== */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </TouchableOpacity>
+
         <Text style={styles.headerTitle}>Riwayat</Text>
       </View>
+      {/* ============================================================= */}
 
       {isLoading ? (
         <View style={styles.emptyContainer}>
@@ -177,7 +182,7 @@ export default function Riwayat() {
           data={tanggalList}
           keyExtractor={(item) => item}
           renderItem={({ item }) => {
-            // === PERHITUNGAN FIX ===
+            // Hitung total income & expense
             const income = groupedData[item]
               .filter((x: Transaksi) => x.jenis === "income")
               .reduce((sum: number, t: any) => {
@@ -235,25 +240,21 @@ export default function Riwayat() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
 
+  /* === HEADER BARU (meniru style TambahRekening) === */
   header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 16,
     backgroundColor: "#00A86B",
-    flexDirection: "row",
+    paddingTop: 50,
+    paddingBottom: 16,
     alignItems: "center",
+    justifyContent: "center",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "600",
-    marginLeft: 20,
-  },
+  backButton: { position: "absolute", left: 20, top: 46 },
+  headerTitle: { fontSize: 20, fontWeight: "600", color: "#fff" },
+  /* ================================================= */
 
-  tanggalWrapper: {
-    backgroundColor: "#fafafa",
-    marginBottom: 4,
-  },
+  tanggalWrapper: { backgroundColor: "#fafafa", marginBottom: 4 },
 
   sekatTanggalAtas: {
     height: 0.4,
@@ -309,10 +310,7 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
 
-  totalAngka: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  totalAngka: { fontSize: 13, fontWeight: "700" },
 
   itemTransaksi: {
     flexDirection: "row",

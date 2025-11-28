@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  BackHandler,
   FlatList,
   Keyboard,
   Modal,
@@ -32,7 +33,8 @@ type TransaksiRow = {
 };
 
 const LIST_REKENING = [
-  'BJB', 'Mandiri', 'BRI', 'BNI', 'BSI', 'BCA', 'Gopay', 'Dana', 'ShopeePay', 'OVO', 'Cash', 'Lainnya',
+  'BJB', 'Mandiri', 'BRI', 'BNI', 'BSI', 'BCA', 'Gopay', 'Dana',
+  'ShopeePay', 'OVO', 'Cash', 'Lainnya',
 ];
 
 export default function EditTransaksi() {
@@ -67,10 +69,30 @@ export default function EditTransaksi() {
     loadData();
   }, []);
 
+  // === TAMBAHAN: HANDLE BACK BUTTON ANDROID ===
+  useEffect(() => {
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      Alert.alert(
+        "Konfirmasi",
+        "Apakah kamu ingin meninggalkan halaman ini?",
+        [
+          { text: "Tidak", style: "cancel" },
+          {
+            text: "Iya",
+            onPress: () => router.back(),
+          },
+        ]
+      );
+      return true; // Mencegah back default
+    });
+
+    return () => handler.remove();
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = (await getAllTransactions(db)) as TransaksiRow[] 
+      const data = (await getAllTransactions(db)) as TransaksiRow[]
       const trx = data.find((t) => String(t.id) === String(idValue));
 
       if (trx) {
@@ -117,7 +139,6 @@ export default function EditTransaksi() {
     return `${hariList[date.getDay()]}, ${date.getDate()} ${bulanList[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-  // === FORMAT RIBUAN BARU ===
   const formatRupiahEdit = (value: string) => {
     const numberString = value.replace(/\D/g, '');
     if (!numberString) return '';
@@ -163,7 +184,10 @@ export default function EditTransaksi() {
       const cleanKategori = kategoriDipilih.replace(/\s+/g, '_');
       await ensureCategoryColumn(db, cleanKategori);
 
-      const tgl = `${tanggalObj.getFullYear()}-${(tanggalObj.getMonth()+1).toString().padStart(2,'0')}-${tanggalObj.getDate().toString().padStart(2,'0')}`;
+      const tgl = `${tanggalObj.getFullYear()}-${(tanggalObj.getMonth()+1)
+        .toString().padStart(2,'0')}-${tanggalObj.getDate()
+        .toString().padStart(2,'0')}`;
+
       const hh = jamObj.getHours().toString().padStart(2, '0');
       const mm = jamObj.getMinutes().toString().padStart(2, '0');
       const jamStr = `${hh}:${mm}`;
@@ -202,7 +226,8 @@ export default function EditTransaksi() {
       'Apakah Anda yakin ingin menghapus transaksi ini?',
       [
         { text: 'Tidak', style: 'cancel' },
-        { text: 'Ya', style: 'destructive', onPress: async () => {
+        {
+          text: 'Ya', style: 'destructive', onPress: async () => {
             try {
               await db.runAsync(`DELETE FROM transaksi WHERE id = ?`, [Number(idValue)]);
               Alert.alert('Sukses', 'Transaksi berhasil dihapus.', [
@@ -212,7 +237,7 @@ export default function EditTransaksi() {
               console.error('Gagal menghapus transaksi:', err);
               Alert.alert('Error', 'Gagal menghapus transaksi.');
             }
-          } 
+          }
         }
       ]
     );
@@ -234,7 +259,11 @@ export default function EditTransaksi() {
             <Text style={styles.header}>Pilih Rekening</Text>
             <View style={styles.grid}>
               {LIST_REKENING.map((item) => (
-                <TouchableOpacity key={item} style={styles.rekeningButton} onPress={() => pilihRekening(item)}>
+                <TouchableOpacity
+                  key={item}
+                  style={styles.rekeningButton}
+                  onPress={() => pilihRekening(item)}
+                >
                   <Text style={styles.rekeningText}>{item}</Text>
                 </TouchableOpacity>
               ))}
@@ -244,8 +273,8 @@ export default function EditTransaksi() {
       </Modal>
 
       <View style={styles.topHeader}>
-        
-        {/* === TOMBOL BACK DENGAN POP UP PERINGATAN === */}
+
+        {/* === TOMBOL BACK DENGAN POP UP === */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -269,6 +298,7 @@ export default function EditTransaksi() {
       </View>
 
       <ScrollView contentContainerStyle={styles.formContainer}>
+
         <View style={styles.switchContainer}>
           <TouchableOpacity
             style={[styles.switchBtn, jenis === 'expense' && styles.switchActive]}
@@ -301,7 +331,10 @@ export default function EditTransaksi() {
           mode={pickerMode || 'date'}
           date={pickerMode === 'date' ? tanggalObj : jamObj}
           is24Hour
-          display={pickerMode === 'date' ? (Platform.OS === 'ios' ? 'inline' : 'calendar') : (Platform.OS === 'ios' ? 'spinner' : 'clock')}
+          display={pickerMode === 'date'
+            ? (Platform.OS === 'ios' ? 'inline' : 'calendar')
+            : (Platform.OS === 'ios' ? 'spinner' : 'clock')
+          }
           onConfirm={(selectedDate) => {
             if (pickerMode === 'date') setTanggalObj(selectedDate);
             else setJamObj(selectedDate);
@@ -334,7 +367,6 @@ export default function EditTransaksi() {
           )}
         </View>
 
-        {/* === INPUT JUMLAH BARU === */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
@@ -379,6 +411,7 @@ export default function EditTransaksi() {
             <Text style={styles.simpanText}>Simpan</Text>
           </TouchableOpacity>
         </View>
+
       </ScrollView>
     </View>
   );
@@ -388,7 +421,15 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalContainer: { backgroundColor: '#fff', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
 
-  topHeader: { backgroundColor: '#00A86B', paddingTop: 50, paddingBottom: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, flexDirection: 'row', alignItems: 'center' },
+  topHeader: {
+    backgroundColor: '#00A86B',
+    paddingTop: 50,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
   backButton: { position: 'absolute', left: 20, top: 50, zIndex: 10 },
   headerTitle: { flex: 1, textAlign: 'center', color: '#fff', fontSize: 20, fontWeight: '600' },
 
@@ -405,13 +446,28 @@ const styles = StyleSheet.create({
   switchTextActive: { color: '#fff', fontWeight: '700' },
 
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  dateButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFEFEF', padding: 10, borderRadius: 8, flex: 0.65, justifyContent: 'space-between' },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFEFEF',
+    padding: 10,
+    borderRadius: 8,
+    flex: 0.65,
+    justifyContent: 'space-between'
+  },
   timeButton: { backgroundColor: '#EFEFEF', padding: 10, borderRadius: 8, flex: 0.3, alignItems: 'center' },
 
   input: { width: '100%', backgroundColor: '#EFEFEF', padding: 12, borderRadius: 8, marginBottom: 15 },
 
   dropdownContainer: { position: 'relative', width: '100%', marginBottom: 15 },
-  dropdownButton: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#EFEFEF', padding: 12, borderRadius: 8, alignItems: 'center' },
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#EFEFEF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
   dropdownList: { backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#ccc', marginTop: 5, elevation: 4, maxHeight: 200 },
   dropdownItem: { paddingVertical: 12, paddingHorizontal: 15 },
   dropdownText: { fontSize: 16 },
@@ -423,3 +479,4 @@ const styles = StyleSheet.create({
   simpanButton: { backgroundColor: '#00A86B', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8 },
   simpanText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
+

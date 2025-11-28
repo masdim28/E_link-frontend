@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   TextInput,
   Alert,
+  BackHandler,
 } from "react-native";
 
 export default function EditRekening() {
@@ -18,6 +19,34 @@ export default function EditRekening() {
   // STATE FORM
   const [nama, setNama] = useState("");
   const [saldo, setSaldo] = useState("");
+
+  // === POP UP KONFIRMASI BACK ===
+  const konfirmasiKeluar = () => {
+    Alert.alert(
+      "Konfirmasi",
+      "Apakah kamu ingin meninggalkan halaman ini?",
+      [
+        { text: "Tidak", style: "cancel" },
+        {
+          text: "Iya",
+          onPress: () => router.back(),
+        },
+      ]
+    );
+  };
+
+  // === HANDLE BACK HP (ANDROID BACK BUTTON) ===
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        konfirmasiKeluar();
+        return true; // Mencegah aksi default
+      }
+    );
+
+    return () => backHandler.remove();
+  }, []);
 
   // DUMMY SAVE HANDLER
   const handleSave = () => {
@@ -37,7 +66,7 @@ export default function EditRekening() {
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={konfirmasiKeluar}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={26} color="#fff" />
