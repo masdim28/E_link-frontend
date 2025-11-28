@@ -54,7 +54,7 @@ export async function ensureRekeningTable(db: SQLite.SQLiteDatabase) {
   `);
 }
 
-// Ambil rekening
+// Ambil semua rekening
 export async function getAllRekening(db: SQLite.SQLiteDatabase) {
   return await db.getAllAsync("SELECT * FROM rekening;");
 }
@@ -132,7 +132,6 @@ export async function insertTransaction(
   );
 
   // ======== UPDATE SALDO REKENING ========
-  // Catatan: saldo awal TIDAK menambah saldo lagi (untuk hindari dobel)
   if (kategori !== "Saldo Awal") {
     const adj = jenis === "income" ? jumlah : -jumlah;
     await updateRekeningSaldo(db, rekening, adj);
@@ -153,4 +152,59 @@ export async function insertPengeluaran(db: SQLite.SQLiteDatabase, data: any) {
 export async function getAllTransactions(db: SQLite.SQLiteDatabase) {
   const data = await db.getAllAsync("SELECT * FROM transaksi;");
   return data;
+}
+
+// =============================
+//   GET TRANSAKSI BY ID
+// =============================
+export async function getTransaksiById(db: SQLite.SQLiteDatabase, id: number) {
+  return await db.getFirstAsync(
+    `SELECT * FROM transaksi WHERE id = ?;`,
+    [id]
+  );
+}
+
+// =============================
+//   UPDATE TRANSAKSI
+// =============================
+export async function updateTransaksi(
+  db: SQLite.SQLiteDatabase,
+  id: number,
+  {
+    tanggal,
+    jam,
+    rekening,
+    jenis,
+    kategori,
+    jumlah,
+  }: {
+    tanggal: string;
+    jam: string;
+    rekening: string;
+    jenis: "income" | "expense";
+    kategori: string;
+    jumlah: number;
+  }
+) {
+  await ensureCategoryColumn(db, kategori);
+  const cleanName = kategori.replace(/\s+/g, "_");
+
+  await db.runAsync(
+    `
+      UPDATE transaksi
+      SET tanggal = ?, jam = ?, rekening = ?, jenis = ?, ${cleanName} = ?
+      WHERE id = ?;
+    `,
+    [tanggal, jam, rekening, jenis, jumlah, id]
+  );
+}
+
+// =============================
+//   GET REKENING BY ID
+// =============================
+export async function getRekeningById(db: SQLite.SQLiteDatabase, id: number) {
+  return await db.getFirstAsync(
+    `SELECT * FROM rekening WHERE id = ?;`,
+    [id]
+  );
 }

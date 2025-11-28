@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
+  BackHandler,
   FlatList,
   Keyboard,
   Modal,
@@ -22,8 +23,7 @@ export default function TambahPemasukan() {
   const db = openDatabase();
 
   const [rekeningBaru, setRekeningBaru] = useState('');
-const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
-
+  const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
 
   const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
   const [tanggal, setTanggal] = useState(new Date());
@@ -49,31 +49,55 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
     'Gopay', 'Dana', 'Mandiri', 'BCA', 'Jago', 'OVO', 'BRI', 'Lainnya', 'Uang Tunai'
   ];
 
+  // ========== POPUP KONFIRMASI KEMBALI ==========
+  const confirmBack = () => {
+    Alert.alert(
+      "Konfirmasi",
+      "Apakah kamu ingin meninggalkan halaman ini?",
+      [
+        { text: "Tidak", style: "cancel" },
+        { text: "Iya", style: "destructive", onPress: () => navigation.goBack() },
+      ]
+    );
+    return true; // mencegah back default
+  };
+
+  // ========== HARDWARE BACK HANDLER ==========
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        return confirmBack();
+      }
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
   const showPickerHandler = (mode: 'date' | 'time') => {
     setPickerMode(mode);
     setShowPicker(true);
   };
 
- const pilihRekening = (item: string) => {
-  if (item === "Lainnya") {
-    setModalVisible(false);
-    setModalRekeningBaru(true);
-  } else {
-    setRekeningDipilih(item);
-    setModalVisible(false);
-  }
-};
-
+  const pilihRekening = (item: string) => {
+    if (item === "Lainnya") {
+      setModalVisible(false);
+      setModalRekeningBaru(true);
+    } else {
+      setRekeningDipilih(item);
+      setModalVisible(false);
+    }
+  };
 
   const pilihDariDropdown = (item: string) => {
-  if (item === "Lainnya") {
-    setDropdownVisible(false);
-    setModalRekeningBaru(true);
-  } else {
-    setRekeningDipilih(item);
-    setDropdownVisible(false);
-  }
-};
+    if (item === "Lainnya") {
+      setDropdownVisible(false);
+      setModalRekeningBaru(true);
+    } else {
+      setRekeningDipilih(item);
+      setDropdownVisible(false);
+    }
+  };
 
   const pilihKategori = (item: string) => {
     setKategoriDipilih(item);
@@ -108,26 +132,14 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
     return `${hari}, ${tgl} ${bulan} ${tahun}`;
   };
 
-  // ========== FORMAT RUPIAH ==========
+  // Format Rupiah
   const formatRupiah = (value: string) => {
     const numberString = value.replace(/\D/g, '');
     if (!numberString) return '';
     return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
-  // ========== POPUP KONFIRMASI KEMBALI ==========
-  const confirmBack = () => {
-    Alert.alert(
-      "Konfirmasi",
-      "Apakah kamu ingin meninggalkan halaman ini?",
-      [
-        { text: "Tidak", style: "cancel" },
-        { text: "Iya", style: "destructive", onPress: () => navigation.goBack() },
-      ]
-    );
-  };
-
-  // ========== SIMPAN KE DATABASE ==========
+  // SIMPAN
   const simpanKeDatabase = async () => {
     const angkaBersih = jumlah.replace(/\./g, "").trim();
 
@@ -163,40 +175,40 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Modal Pilih Rekening */}
-{/* Modal Input Rekening Baru */}
-<Modal visible={modalRekeningBaru} transparent animationType="fade">
-  <View style={styles.overlay}>
-    <View style={styles.modalContainer}>
-      <Text style={styles.header}>Rekening Baru</Text>
+      
+      {/* MODAL REKENING BARU */}
+      <Modal visible={modalRekeningBaru} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.header}>Rekening Baru</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Masukkan nama rekening"
-        value={rekeningBaru}
-        onChangeText={setRekeningBaru}
-      />
+            <TextInput
+              style={styles.input}
+              placeholder="Masukkan nama rekening"
+              value={rekeningBaru}
+              onChangeText={setRekeningBaru}
+            />
 
-      <TouchableOpacity
-        style={styles.simpanButton}
-        onPress={() => {
-          if (rekeningBaru.trim() === '') {
-            Alert.alert("Peringatan", "Nama rekening tidak boleh kosong.");
-            return;
-          }
+            <TouchableOpacity
+              style={styles.simpanButton}
+              onPress={() => {
+                if (rekeningBaru.trim() === '') {
+                  Alert.alert("Peringatan", "Nama rekening tidak boleh kosong.");
+                  return;
+                }
 
-          setRekeningDipilih(rekeningBaru.trim());
-          setRekeningBaru('');
-          setModalRekeningBaru(false);
-        }}
-      >
-        <Text style={styles.simpanText}>Simpan</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-</Modal>
+                setRekeningDipilih(rekeningBaru.trim());
+                setRekeningBaru('');
+                setModalRekeningBaru(false);
+              }}
+            >
+              <Text style={styles.simpanText}>Simpan</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
-
+      {/* MODAL PILIH REKENING */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modalContainer}>
@@ -231,7 +243,7 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
 
       <ScrollView contentContainerStyle={styles.formContainer}>
 
-        {/* Tanggal & Jam */}
+        {/* Tanggal / Jam */}
         <View style={styles.row}>
           <TouchableOpacity
             style={styles.dateButton}
@@ -312,7 +324,7 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
           )}
         </View>
 
-        {/* INPUT JUMLAH */}
+        {/* Input Jumlah */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
@@ -321,7 +333,7 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
           onChangeText={(text) => setJumlah(formatRupiah(text))}
         />
 
-        {/* KATEGORI */}
+        {/* kategori */}
         <TextInput
           style={styles.input}
           placeholder="Kategori yang Dipilih"
@@ -341,7 +353,7 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
           ))}
         </View>
 
-        {/* Tambah kategori */}
+        {/* Tambah Kategori */}
         <TextInput
           style={styles.input}
           placeholder="Tambah Kategori Baru"
@@ -350,7 +362,7 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
           onSubmitEditing={handleSubmitEditing}
         />
 
-        {/* SIMPAN */}
+        {/* Tombol Simpan */}
         <TouchableOpacity
           style={styles.simpanButton}
           onPress={simpanKeDatabase}

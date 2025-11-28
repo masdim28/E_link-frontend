@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
+  BackHandler,
   FlatList,
   Keyboard,
   Modal,
@@ -19,18 +20,22 @@ import { insertTransaction, openDatabase } from '../database/database';
 export default function TambahPengeluaran() {
   const navigation = useNavigation();
   const db = openDatabase();
-const [rekeningBaru, setRekeningBaru] = useState('');
-const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
+
+  const [rekeningBaru, setRekeningBaru] = useState('');
+  const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
 
   const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
   const [tanggal, setTanggal] = useState(new Date());
   const [jam, setJam] = useState(new Date());
+
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+
   const [jumlah, setJumlah] = useState('');
   const [kategoriDipilih, setKategoriDipilih] = useState('');
   const [modalVisible, setModalVisible] = useState(true);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+
   const [kategoriBaru, setKategoriBaru] = useState('');
   const [kategoriList, setKategoriList] = useState([
     'Makanan',
@@ -53,6 +58,33 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
     'Uang Tunai',
   ];
 
+  // ============================
+  // 🔥 POPUP KONFIRMASI BACK
+  // ============================
+  const confirmBack = () => {
+    Alert.alert(
+      'Konfirmasi',
+      'Apakah kamu ingin meninggalkan halaman ini?',
+      [
+        { text: 'Tidak', style: 'cancel' },
+        { text: 'Iya', style: 'destructive', onPress: () => navigation.goBack() },
+      ]
+    );
+    return true; // cegah aksi back default
+  };
+
+  // ============================
+  // 🔥 HANDLE BACK HARDWARE
+  // ============================
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      confirmBack
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
   const handleDateChange = (_: any, selectedDate?: Date) => {
     const currentDate = selectedDate || tanggal;
     setShowDatePicker(false);
@@ -66,25 +98,24 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
   };
 
   const pilihRekening = (item: string) => {
-  if (item === "Lainnya") {
-    setModalVisible(false);
-    setModalRekeningBaru(true);
-  } else {
-    setRekeningDipilih(item);
-    setModalVisible(false);
-  }
-};
+    if (item === 'Lainnya') {
+      setModalVisible(false);
+      setModalRekeningBaru(true);
+    } else {
+      setRekeningDipilih(item);
+      setModalVisible(false);
+    }
+  };
 
   const pilihDariDropdown = (item: string) => {
-  if (item === "Lainnya") {
-    setDropdownVisible(false);
-    setModalRekeningBaru(true);
-  } else {
-    setRekeningDipilih(item);
-    setDropdownVisible(false);
-  }
-};
-
+    if (item === 'Lainnya') {
+      setDropdownVisible(false);
+      setModalRekeningBaru(true);
+    } else {
+      setRekeningDipilih(item);
+      setDropdownVisible(false);
+    }
+  };
 
   const pilihKategori = (item: string) => {
     setKategoriDipilih(item);
@@ -129,10 +160,10 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
       'Desember',
     ];
     const hari = hariList[date.getDay()];
-    const tanggal = date.getDate();
+    const tgl = date.getDate();
     const bulan = bulanList[date.getMonth()];
     const tahun = date.getFullYear();
-    return `${hari}, ${tanggal} ${bulan} ${tahun}`;
+    return `${hari}, ${tgl} ${bulan} ${tahun}`;
   };
 
   const formatRupiah = (value: string) => {
@@ -173,43 +204,44 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      
+      {/* Modal Rekening Baru */}
+      <Modal visible={modalRekeningBaru} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.header}>Rekening Baru</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Masukkan nama rekening"
+              value={rekeningBaru}
+              onChangeText={setRekeningBaru}
+            />
+
+            <TouchableOpacity
+              style={styles.simpanButton}
+              onPress={() => {
+                if (rekeningBaru.trim() === '') {
+                  Alert.alert('Peringatan', 'Nama rekening tidak boleh kosong.');
+                  return;
+                }
+                setRekeningDipilih(rekeningBaru.trim());
+                setRekeningBaru('');
+                setModalRekeningBaru(false);
+              }}
+            >
+              <Text style={styles.simpanText}>Simpan</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal Pilih Rekening */}
-<Modal visible={modalRekeningBaru} transparent animationType="fade">
-  <View style={styles.overlay}>
-    <View style={styles.modalContainer}>
-      <Text style={styles.header}>Rekening Baru</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Masukkan nama rekening"
-        value={rekeningBaru}
-        onChangeText={setRekeningBaru}
-      />
-
-      <TouchableOpacity
-        style={styles.simpanButton}
-        onPress={() => {
-          if (rekeningBaru.trim() === '') {
-            Alert.alert("Peringatan", "Nama rekening tidak boleh kosong.");
-            return;
-          }
-
-          setRekeningDipilih(rekeningBaru.trim());
-          setRekeningBaru('');
-          setModalRekeningBaru(false);
-        }}
-      >
-        <Text style={styles.simpanText}>Simpan</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-</Modal>
-
-
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.header}>Pilih Rekening</Text>
+
             <View style={styles.grid}>
               {daftarRekening.map((item) => (
                 <TouchableOpacity
@@ -225,24 +257,9 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
         </View>
       </Modal>
 
-      {/* Header Hijau */}
+      {/* Header */}
       <View style={styles.topHeader}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            Alert.alert(
-              'Konfirmasi',
-              'Apakah kamu ingin meninggalkan halaman ini?',
-              [
-                { text: 'Tidak', style: 'cancel' },
-                {
-                  text: 'Iya',
-                  onPress: () => navigation.goBack(),
-                },
-              ]
-            );
-          }}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={confirmBack}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
 
@@ -251,6 +268,7 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
 
       {/* Form */}
       <ScrollView contentContainerStyle={styles.formContainer}>
+
         <View style={styles.row}>
           <TouchableOpacity
             style={styles.dateButton}
@@ -323,7 +341,6 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
           )}
         </View>
 
-        {/* Input Jumlah */}
         <TextInput
           style={styles.input}
           placeholder="Jumlah"
@@ -362,6 +379,7 @@ const [modalRekeningBaru, setModalRekeningBaru] = useState(false);
         <TouchableOpacity style={styles.simpanButton} onPress={handleSimpan}>
           <Text style={styles.simpanText}>Simpan</Text>
         </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
@@ -458,7 +476,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   dropdownContainer: {
-    position: 'relative',
     width: '100%',
     marginBottom: 15,
   },

@@ -37,7 +37,7 @@ const LIST_REKENING = [
 
 export default function EditTransaksi() {
   const router = useRouter();
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams() as { id?: string | string[] | undefined };
   const idRaw = params.id;
   const idValue = Array.isArray(idRaw) ? idRaw[0] : idRaw;
 
@@ -70,24 +70,31 @@ export default function EditTransaksi() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data: TransaksiRow[] = await getAllTransactions(db);
+      // getAllTransactions mungkin mengembalikan unknown[] — amankan dan cast jika berupa array
+      const raw = await getAllTransactions(db);
+      const data: TransaksiRow[] = Array.isArray(raw) ? (raw as TransaksiRow[]) : [];
+
       const trx = data.find((t) => String(t.id) === String(idValue));
 
       if (trx) {
         setRekeningDipilih(trx.rekening || null);
-        setJenis(trx.jenis || 'income');
+        setJenis((trx.jenis as 'income' | 'expense') || 'income');
 
         if (trx.tanggal) {
-          const [y, m, d] = trx.tanggal.split('-').map(Number);
-          setTanggalObj(new Date(y, m - 1, d));
+          const [y, m, d] = String(trx.tanggal).split('-').map(Number);
+          if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
+            setTanggalObj(new Date(y, m - 1, d));
+          }
         }
 
         if (trx.jam) {
-          const [hh, mm] = trx.jam.split(':').map(Number);
-          const t = new Date();
-          t.setHours(hh);
-          t.setMinutes(mm);
-          setJamObj(t);
+          const [hh, mm] = String(trx.jam).split(':').map(Number);
+          if (!Number.isNaN(hh) && !Number.isNaN(mm)) {
+            const t = new Date();
+            t.setHours(hh);
+            t.setMinutes(mm);
+            setJamObj(t);
+          }
         }
 
         const kategoriKeys = Object.keys(trx).filter(

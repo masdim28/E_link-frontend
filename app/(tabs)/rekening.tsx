@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 
-// Import fungsi dari database
 import { getAllRekening, openDatabase } from '../../database/database';
 
 type Rekening = {
@@ -25,19 +24,16 @@ export default function RekeningScreen() {
   const [totalSaldo, setTotalSaldo] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fungsi untuk mengambil data rekening
   const loadRekening = useCallback(async () => {
     setIsLoading(true);
     try {
       const db = openDatabase(); 
       const rekeningListRaw = await getAllRekening(db);
-      
-      // --- Type assertion agar TypeScript tahu ini Rekening[]
+
       const rekeningList: Rekening[] = (rekeningListRaw as unknown[]) as Rekening[];
 
       setData(rekeningList);
 
-      // Hitung total saldo
       const total = rekeningList.reduce((sum, item) => sum + item.saldo, 0);
       setTotalSaldo(total);
 
@@ -48,7 +44,6 @@ export default function RekeningScreen() {
     }
   }, []);
 
-  // Memuat data saat komponen fokus (setiap kali tab dibuka)
   useFocusEffect(
     useCallback(() => {
       loadRekening();
@@ -57,12 +52,21 @@ export default function RekeningScreen() {
   );
   
   const renderItem = ({ item }: { item: Rekening }) => (
-    <View style={styles.item}>
-      <Text style={styles.itemBank}>{item.bank}</Text>
-      <Text style={styles.itemSaldo}>
-        Rp {item.saldo.toLocaleString('id-ID')}
-      </Text>
-    </View>
+    <TouchableOpacity
+      onPress={() =>
+        router.push({
+          pathname: "/edit-rekening",
+          params: { id: item.id.toString() }
+        })
+      }
+    >
+      <View style={styles.item}>
+        <Text style={styles.itemBank}>{item.bank}</Text>
+        <Text style={styles.itemSaldo}>
+          Rp {item.saldo.toLocaleString('id-ID')}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   if (isLoading && data.length === 0) {
@@ -76,7 +80,6 @@ export default function RekeningScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Rekening</Text>
 
@@ -88,7 +91,6 @@ export default function RekeningScreen() {
         </View>
       </View>
 
-      {/* Daftar rekening */}
       <FlatList
         data={data}
         renderItem={renderItem}
@@ -101,7 +103,6 @@ export default function RekeningScreen() {
         onRefresh={loadRekening}
       />
 
-      {/* Tombol tambah */}
       <View style={styles.fabContainer}>
         <TouchableOpacity 
           style={styles.addButton} 
@@ -115,7 +116,6 @@ export default function RekeningScreen() {
   );
 }
 
-// Style
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
