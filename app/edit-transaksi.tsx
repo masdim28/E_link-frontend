@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   BackHandler,
-  FlatList,
   Keyboard,
   Modal,
   Platform,
@@ -20,6 +19,7 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import {
   ensureCategoryColumn,
   getAllTransactions,
+  getAllRekening,
   openDatabase,
 } from '../database/database';
 
@@ -32,10 +32,11 @@ type TransaksiRow = {
   [key: string]: any;
 };
 
-const LIST_REKENING = [
-  'BJB', 'Mandiri', 'BRI', 'BNI', 'BSI', 'BCA', 'Gopay', 'Dana',
-  'ShopeePay', 'OVO', 'Cash', 'Lainnya',
-];
+type RekeningRow = {
+  id: number;
+  bank: string;
+  saldo: number;
+};
 
 export default function EditTransaksi() {
   const router = useRouter();
@@ -47,6 +48,7 @@ export default function EditTransaksi() {
 
   const [loading, setLoading] = useState(true);
   const [rekeningDipilih, setRekeningDipilih] = useState<string | null>(null);
+  const [rekeningList, setRekeningList] = useState<RekeningRow[]>([]);
   const [tanggalObj, setTanggalObj] = useState<Date>(new Date());
   const [jamObj, setJamObj] = useState<Date>(new Date());
   const [showPicker, setShowPicker] = useState(false);
@@ -92,7 +94,13 @@ export default function EditTransaksi() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = (await getAllTransactions(db)) as TransaksiRow[]
+      // Ambil daftar rekening dari DB
+      const rekeningData = (await getAllRekening(db)) as RekeningRow[];
+      // jika field tabel nama kolom berbeda, adjust di sini; asumsi: bank, saldo
+      setRekeningList(Array.isArray(rekeningData) ? rekeningData : []);
+
+      // Ambil transaksi
+      const data = (await getAllTransactions(db)) as TransaksiRow[];
       const trx = data.find((t) => String(t.id) === String(idValue));
 
       if (trx) {
@@ -258,13 +266,13 @@ export default function EditTransaksi() {
           <View style={styles.modalContainer}>
             <Text style={styles.header}>Pilih Rekening</Text>
             <View style={styles.grid}>
-              {LIST_REKENING.map((item) => (
+              {rekeningList.map((item) => (
                 <TouchableOpacity
-                  key={item}
+                  key={item.id}
                   style={styles.rekeningButton}
-                  onPress={() => pilihRekening(item)}
+                  onPress={() => pilihRekening(item.bank)}
                 >
-                  <Text style={styles.rekeningText}>{item}</Text>
+                  <Text style={styles.rekeningText}>{item.bank}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -354,15 +362,12 @@ export default function EditTransaksi() {
 
           {dropdownVisible && (
             <View style={styles.dropdownList}>
-              <FlatList
-                data={LIST_REKENING}
-                keyExtractor={(item) => item}
-                renderItem={({ item }) => (
-                  <TouchableOpacity style={styles.dropdownItem} onPress={() => pilihDariDropdown(item)}>
-                    <Text style={styles.dropdownText}>{item}</Text>
-                  </TouchableOpacity>
-                )}
-              />
+              {/* GANTI FlatList DENGAN RENDER MAP SUPAYA TIDAK NESTED VIRTUALIZEDLIST */}
+              {rekeningList.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.dropdownItem} onPress={() => pilihDariDropdown(item.bank)}>
+                  <Text style={styles.dropdownText}>{item.bank}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
         </View>
@@ -479,4 +484,3 @@ const styles = StyleSheet.create({
   simpanButton: { backgroundColor: '#00A86B', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8 },
   simpanText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
-
