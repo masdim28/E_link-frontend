@@ -7,8 +7,13 @@ export function openDatabase() {
   const db = SQLite.openDatabaseSync("eling.db");
   ensureTransaksiTable(db);
   ensureRekeningTable(db);
+
+  // Tambah rekening default Uang Tunai
+  ensureDefaultCashWallet(db);
+
   return db;
 }
+
 
 // Tabel transaksi
 async function ensureTransaksiTable(db: SQLite.SQLiteDatabase) {
@@ -53,6 +58,16 @@ export async function ensureRekeningTable(db: SQLite.SQLiteDatabase) {
     );
   `);
 }
+// =============================
+//   DEFAULT WALLET (UANG TUNAI)
+// =============================
+async function ensureDefaultCashWallet(db: SQLite.SQLiteDatabase) {
+  await db.runAsync(
+    `INSERT OR IGNORE INTO rekening (id, bank, saldo)
+     VALUES (1, 'Uang Tunai', 0);`
+  );
+}
+
 
 // =============================
 //   CEK NAMA REKENING SUDAH ADA

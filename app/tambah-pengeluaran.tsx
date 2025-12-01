@@ -53,7 +53,8 @@ export default function TambahPengeluaran() {
       const database = await openDatabase();
       setDb(database);
       const data = await getAllRekening(database) as RekeningRow[];
-      setRekeningList([{ id: 0, bank: 'Uang Tunai', saldo: 0 }, ...data]);
+      setRekeningList(data);
+
     }
     loadDb();
   }, []);

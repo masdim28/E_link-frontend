@@ -55,7 +55,8 @@ export default function TambahPemasukan() {
       const data = await getAllRekening(database) as RekeningRow[];
 
       // Tambahkan Uang Tunai sebagai pilihan tetap di awal
-      setRekeningList([{ id: 0, bank: 'Uang Tunai', saldo: 0 }, ...data]);
+      setRekeningList(data);
+
     }
 
     loadDb();
