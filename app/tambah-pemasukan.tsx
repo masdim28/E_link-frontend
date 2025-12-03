@@ -294,18 +294,18 @@ export default function TambahPemasukan() {
 
           {dropdownVisible && (
             <View style={styles.dropdownList}>
-              <FlatList
-                data={rekeningList}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => pilihDariDropdown(item.bank)}
-                  >
-                    <Text style={styles.dropdownText}>{item.bank}</Text>
-                  </TouchableOpacity>
-                )}
-              />
+            <ScrollView style={{ maxHeight: 200 }}>
+  {rekeningList.map((item) => (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.dropdownItem}
+      onPress={() => pilihDariDropdown(item.bank)}
+    >
+      <Text style={styles.dropdownText}>{item.bank}</Text>
+    </TouchableOpacity>
+  ))}
+</ScrollView>
+
             </View>
           )}
         </View>

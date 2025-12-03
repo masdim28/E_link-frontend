@@ -36,9 +36,10 @@ export default function EditRekening() {
 
   const [bank, setBank] = useState("");
   const [saldo, setSaldo] = useState("");
+  const [isCash, setIsCash] = useState(false); // <-- cek apakah ini rekening Uang Tunai
 
   // ==============================
-  // FORMAT ANGKA -> 1.000 10.500
+  // FORMAT ANGKA
   // ==============================
   const formatNumber = (value: string) => {
     const clean = value.replace(/\D/g, "");
@@ -70,6 +71,9 @@ export default function EditRekening() {
 
       setBank(data.bank);
       setSaldo(formatNumber(String(data.saldo)));
+
+      // jika rekening = "Uang Tunai" maka nama tidak boleh diubah
+      setIsCash(data.bank.toLowerCase() === "uang tunai");
     };
 
     loadData();
@@ -89,7 +93,7 @@ export default function EditRekening() {
     );
   };
 
-  // BUTTON BACK HP
+  // tombol back HP
   useEffect(() => {
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
@@ -113,15 +117,26 @@ export default function EditRekening() {
 
     const db = openDatabase();
 
-    // cek duplikat rekening (kecuali rekening ini sendiri)
-    const exists = await isRekeningExists(db, bank.trim());
-
     const nowData = (await getRekeningById(
       db,
       Number(id)
     )) as RekeningRow | null;
 
-    const currentName = nowData?.bank;
+    if (!nowData) return;
+
+    // ============================
+    // CEK REKENING UANG TUNAI
+    // ============================
+    if (isCash && bank.trim() !== nowData.bank) {
+      Alert.alert("Peringatan", "Rekening Uang Tunai tidak dapat diubah namanya.");
+      setBank(nowData.bank); // reset kembali agar tidak berubah
+      return;
+    }
+
+    // cek duplikat rekening
+    const exists = await isRekeningExists(db, bank.trim());
+
+    const currentName = nowData.bank;
 
     if (exists && bank.trim() !== currentName) {
       Alert.alert("Nama Sudah Ada", `Rekening "${bank}" sudah digunakan.`);
@@ -177,12 +192,23 @@ export default function EditRekening() {
         style={{ flex: 1 }}
       >
         <View style={styles.content}>
+          
           {/* INPUT: Nama Rekening */}
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              isCash && { backgroundColor: "#dcdcdc" }, // disable warna
+            ]}
             placeholder="Nama Rekening"
             value={bank}
-            onChangeText={setBank}
+            editable={!isCash} // <-- Kunci nama rekening Uang Tunai
+            onChangeText={(text) => {
+              if (isCash) {
+                Alert.alert("Peringatan", "Rekening Uang Tunai tidak dapat diubah namanya.");
+                return;
+              }
+              setBank(text);
+            }}
           />
 
           {/* INPUT: Saldo */}
