@@ -22,22 +22,11 @@ const colorFromString = (s: string) => {
 };
 
 const monthNames = [
-  "Januari",
-  "Februari",
-  "Maret",
-  "April",
-  "Mei",
-  "Juni",
-  "Juli",
-  "Agustus",
-  "September",
-  "Oktober",
-  "November",
-  "Desember",
+  "Januari","Februari","Maret","April","Mei","Juni",
+  "Juli","Agustus","September","Oktober","November","Desember",
 ];
 
 function getLastDayOfMonth(year: number, month: number) {
-  // month = 1..12
   return new Date(year, month, 0).getDate();
 }
 
@@ -53,7 +42,7 @@ export default function RekapScreen() {
 
   const today = new Date();
   const [isBulanan, setIsBulanan] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState<number>(today.getMonth() + 1); // 1..12
+  const [selectedMonth, setSelectedMonth] = useState<number>(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(today.getFullYear());
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -63,7 +52,6 @@ export default function RekapScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [mode, setMode] = useState<"bulan" | "tahun">("bulan");
 
-  // ambil daftar kolom kategori (dinamis)
   const loadColumns = async () => {
     try {
       const cols = await getExistingColumns(db);
@@ -77,26 +65,21 @@ export default function RekapScreen() {
     }
   };
 
-  // load columns satu kali
   useEffect(() => {
     loadColumns();
   }, []);
 
-  // ambil rekap (fungsi umum untuk rentang tanggal)
   const loadRekapForRange = async (startDate: string, endDate: string) => {
     setLoading(true);
     try {
-      // pastikan categories terisi, jika kosong -> tetap set kosong
       if (!categories || categories.length === 0) {
         setRekapData([]);
         setLoading(false);
         return;
       }
 
-      // untuk tiap kategori, hitung SUM kolomnya dalam range
       const rows: RekapRow[] = [];
       for (const cat of categories) {
-        // gunakan COALESCE supaya null treated as 0
         const sql = `SELECT SUM(COALESCE(${cat}, 0)) AS total FROM transaksi WHERE tanggal BETWEEN ? AND ?`;
         const res: any[] = await db.getAllAsync(sql, [startDate, endDate]);
         const total = (res[0]?.total ?? 0) as number;
@@ -116,7 +99,6 @@ export default function RekapScreen() {
     }
   };
 
-  // helper load based on mode (bulanan/tahunan)
   const loadCurrentRekap = async () => {
     if (isBulanan) {
       const m = String(selectedMonth).padStart(2, "0");
@@ -131,14 +113,14 @@ export default function RekapScreen() {
     }
   };
 
-  // reload ketika opsi berubah (bulan/tahun/mode/categories)
   useEffect(() => {
     loadCurrentRekap();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBulanan, selectedMonth, selectedYear, categories]);
 
-  // prepare data untuk pie chart
-  const totalAmount = useMemo(() => rekapData.reduce((s, r) => s + r.amount, 0), [rekapData]);
+  const totalAmount = useMemo(
+    () => rekapData.reduce((s, r) => s + r.amount, 0),
+    [rekapData]
+  );
 
   const chartData = rekapData.map((r) => ({
     name: r.name,
@@ -148,8 +130,7 @@ export default function RekapScreen() {
     legendFontSize: 12,
   }));
 
-  // years list (customize range jika perlu)
-  const tahunList = Array.from({ length: 10 }, (_, i) => today.getFullYear() - 5 + i);
+  const tahunList = Array.from({ length: 50 }, (_, i) => today.getFullYear() - 20 + i);
 
   return (
     <View style={styles.container}>
@@ -164,40 +145,51 @@ export default function RekapScreen() {
           style={[styles.switchButton, isBulanan && styles.switchActive]}
           onPress={() => setIsBulanan(true)}
         >
-          <Text style={[styles.switchText, isBulanan && styles.switchTextActive]}>Bulanan</Text>
+          <Text style={[styles.switchText, isBulanan && styles.switchTextActive]}>
+            Bulanan
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.switchButton, !isBulanan && styles.switchActive]}
           onPress={() => setIsBulanan(false)}
         >
-          <Text style={[styles.switchText, !isBulanan && styles.switchTextActive]}>Tahunan</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Month/Year selector */}
-      <View style={styles.selectorRow}>
-        <TouchableOpacity
-          style={styles.selectorButton}
-          onPress={() => {
-            setMode("bulan");
-            setModalVisible(true);
-          }}
-        >
-          <Text style={styles.selectorText}>
-            {monthNames[selectedMonth - 1]} {selectedYear}
+          <Text style={[styles.switchText, !isBulanan && styles.switchTextActive]}>
+            Tahunan
           </Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.selectorButton}
-          onPress={() => {
-            setMode("tahun");
-            setModalVisible(true);
-          }}
-        >
-          <Text style={styles.selectorText}>Ganti Tahun</Text>
-        </TouchableOpacity>
       </View>
+
+      {/* === TOMBOL GANTI BULAN === */}
+      {isBulanan && (
+        <View style={{ alignItems: "center", marginTop: 10 }}>
+          <TouchableOpacity
+            onPress={() => {
+              setMode("bulan");
+              setModalVisible(true);
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "#00A86B" }}>
+              {monthNames[selectedMonth - 1]} {selectedYear} ▾
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* === TOMBOL GANTI TAHUN (TAMBAHAN) === */}
+      {!isBulanan && (
+        <View style={{ alignItems: "center", marginTop: 10 }}>
+          <TouchableOpacity
+            onPress={() => {
+              setMode("tahun");
+              setModalVisible(true);
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "#00A86B" }}>
+              {selectedYear} ▾
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Chart */}
       <View style={styles.chartWrapper}>
@@ -223,7 +215,7 @@ export default function RekapScreen() {
         )}
       </View>
 
-      {/* List kategori + persen */}
+      {/* List kategori */}
       <ScrollView style={styles.listContainer}>
         {rekapData.map((item, idx) => {
           const persen = totalAmount > 0 ? ((item.amount / totalAmount) * 100).toFixed(1) : "0.0";
@@ -233,14 +225,17 @@ export default function RekapScreen() {
               <Text style={styles.category}>{item.name}</Text>
               <Text style={styles.percent}>{persen}%</Text>
               <Text style={styles.amount}>
-                {Number(item.amount).toLocaleString("id-ID", { style: "currency", currency: "IDR" })}
+                {Number(item.amount).toLocaleString("id-ID", {
+                  style: "currency",
+                  currency: "IDR",
+                })}
               </Text>
             </View>
           );
         })}
       </ScrollView>
 
-      {/* Modal picker bulan/tahun */}
+      {/* Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalBg}>
           <View style={styles.modalBox}>
@@ -249,36 +244,37 @@ export default function RekapScreen() {
             </Text>
 
             <ScrollView style={{ maxHeight: 300 }}>
-              {mode === "bulan" ? (
-                monthNames.map((m, i) => (
-                  <TouchableOpacity
-                    key={m}
-                    style={styles.option}
-                    onPress={() => {
-                      setSelectedMonth(i + 1);
-                      setModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.optionText}>{m}</Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                tahunList.map((t) => (
-                  <TouchableOpacity
-                    key={t}
-                    style={styles.option}
-                    onPress={() => {
-                      setSelectedYear(t);
-                      setModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.optionText}>{t}</Text>
-                  </TouchableOpacity>
-                ))
-              )}
+              {mode === "bulan"
+                ? monthNames.map((m, i) => (
+                    <TouchableOpacity
+                      key={m}
+                      style={styles.option}
+                      onPress={() => {
+                        setSelectedMonth(i + 1);
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.optionText}>{m}</Text>
+                    </TouchableOpacity>
+                  ))
+                : tahunList.map((t) => (
+                    <TouchableOpacity
+                      key={t}
+                      style={styles.option}
+                      onPress={() => {
+                        setSelectedYear(t);
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.optionText}>{t}</Text>
+                    </TouchableOpacity>
+                  ))}
             </ScrollView>
 
-            <TouchableOpacity style={styles.btnClose} onPress={() => setModalVisible(false)}>
+            <TouchableOpacity
+              style={styles.btnClose}
+              onPress={() => setModalVisible(false)}
+            >
               <Text style={{ color: "#fff" }}>Tutup</Text>
             </TouchableOpacity>
           </View>
@@ -322,11 +318,7 @@ const styles = StyleSheet.create({
   switchText: { color: "#fff", fontSize: 14 },
   switchTextActive: { color: "#fff", fontWeight: "600" },
 
-  selectorRow: { flexDirection: "row", justifyContent: "center", gap: 12, marginTop: 12 },
-  selectorButton: { backgroundColor: "#EFEFEF", padding: 10, borderRadius: 8 },
-  selectorText: { fontWeight: "600" },
-
-  chartWrapper: { alignItems: "center", marginTop: 10 },
+  chartWrapper: { alignItems: "center", marginTop: 15 },
 
   listContainer: { marginTop: 10, paddingHorizontal: 20 },
   listItem: { flexDirection: "row", alignItems: "center", marginVertical: 6 },
@@ -339,5 +331,11 @@ const styles = StyleSheet.create({
   modalBox: { backgroundColor: "#fff", padding: 16, borderRadius: 12, maxHeight: "80%" },
   option: { paddingVertical: 10 },
   optionText: { fontSize: 16 },
-  btnClose: { marginTop: 12, backgroundColor: "#00A86B", paddingVertical: 10, borderRadius: 8, alignItems: "center" },
+  btnClose: {
+    marginTop: 12,
+    backgroundColor: "#00A86B",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
 });
