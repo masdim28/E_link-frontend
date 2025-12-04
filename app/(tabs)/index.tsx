@@ -1,8 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { MaterialIcons } from '@expo/vector-icons';
 
 import {
   ActivityIndicator,
@@ -65,15 +64,31 @@ export default function TransaksiScreen() {
     setLoading(true);
    const data = (await getAllTransactions(db)) as any as Transaction[];
 
-    const filtered = data.filter(item => item.tanggal === selectedDate);
+    const normalize = (t: string) =>
+  new Date(t).toISOString().split("T")[0];
+
+const filtered = data.filter(
+  item => normalize(item.tanggal) === selectedDate
+);
+
 
     // Ambil kategori yang nilainya > 0
     const mapped = filtered.map(item => {
       const kategoriKeys = Object.keys(item).filter(
-        k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
-      );
-      const foundKategori = kategoriKeys.find(k => Number(item[k]) > 0) || '';
-      const jumlah = foundKategori ? Number(item[foundKategori]) : 0;
+  k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
+);
+
+let foundKategori = '';
+let jumlah = 0;
+
+for (const key of kategoriKeys) {
+  if (item[key] != null && Number(item[key]) > 0) {
+    foundKategori = key;
+    jumlah = Number(item[key]);
+    break;
+  }
+}
+
       return { ...item, kategori: foundKategori.replace(/_/g, ' '), jumlah };
     });
 

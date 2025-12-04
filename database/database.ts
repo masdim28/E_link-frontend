@@ -267,3 +267,13 @@ export async function deleteRekening(
     [id]
   );
 }
+export async function updateNamaRekeningDiTransaksi(
+  db: SQLite.SQLiteDatabase,
+  oldName: string,
+  newName: string
+) {
+  await db.runAsync(
+    `UPDATE transaksi SET rekening = ? WHERE rekening = ?`,
+    [newName, oldName]
+  );
+}
