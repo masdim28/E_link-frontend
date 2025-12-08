@@ -2,24 +2,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
-  BackHandler,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    BackHandler,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import {
-  deleteRekening,
-  getRekeningById,
-  isRekeningExists,
-  openDatabase,
-  updateNamaRekeningDiTransaksi,
-  updateRekening,
+    deleteInitialBalanceTransaction,
+    deleteRekening,
+    getRekeningById,
+    isRekeningExists,
+    openDatabase,
+    updateInitialBalanceTransaction,
+    updateNamaRekeningDiTransaksi,
+    updateRekening,
 } from "../database/database";
 
 // ==========================
@@ -34,14 +36,13 @@ type RekeningRow = {
 export default function EditRekening() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const db = openDatabase();
 
   const [bank, setBank] = useState("");
   const [saldo, setSaldo] = useState("");
   const [isCash, setIsCash] = useState(false);
+  const [originalBankName, setOriginalBankName] = useState("");
 
-  // ==========================================
-  // FORMAT ANGKA
-  // ==========================================
   const formatNumber = (value: string) => {
     const clean = value.replace(/\D/g, "");
     if (!clean) return "";
@@ -52,17 +53,11 @@ export default function EditRekening() {
     setSaldo(formatNumber(text));
   };
 
-  // ==========================================
-  // LOAD DATA
-  // ==========================================
   useEffect(() => {
     const loadData = async () => {
-      const db = openDatabase();
+      if (!db) return;
 
-      const data = (await getRekeningById(
-        db,
-        Number(id)
-      )) as RekeningRow | null;
+      const data = (await getRekeningById(db, Number(id))) as RekeningRow | null;
 
       if (!data) {
         Alert.alert("Error", "Rekening tidak ditemukan.");
@@ -71,6 +66,7 @@ export default function EditRekening() {
       }
 
       setBank(data.bank);
+      setOriginalBankName(data.bank);
       setSaldo(formatNumber(String(data.saldo)));
       setIsCash(data.bank.toLowerCase() === "uang tunai");
     };
@@ -78,9 +74,6 @@ export default function EditRekening() {
     loadData();
   }, [id]);
 
-  // ==========================================
-  // KONFIRMASI KELUAR
-  // ==========================================
   const konfirmasiKeluar = () => {
     Alert.alert("Konfirmasi", "Apakah kamu ingin meninggalkan halaman ini?", [
       { text: "Tidak", style: "cancel" },
@@ -96,76 +89,98 @@ export default function EditRekening() {
     return () => backHandler.remove();
   }, []);
 
-  // ==========================================
-  // SAVE REKENING
-  // ==========================================
   const handleSave = async () => {
     if (!bank.trim()) {
       Alert.alert("Error", "Nama rekening tidak boleh kosong.");
       return;
     }
+    if (!db) return;
 
-    const db = openDatabase();
-
-    const nowData = (await getRekeningById(
-      db,
-      Number(id)
-    )) as RekeningRow | null;
-
-    if (!nowData) return;
-
-    const oldName = nowData.bank; // <-- NAMA LAMA DISIMPAN
-
-    if (isCash && bank.trim() !== oldName) {
-      Alert.alert("Peringatan", "Rekening Uang Tunai tidak dapat diubah namanya.");
-      setBank(oldName);
-      return;
-    }
-
-    // Cek duplikat
-    const exists = await isRekeningExists(db, bank.trim());
-
-    if (exists && bank.trim() !== oldName) {
-      Alert.alert("Nama Sudah Ada", `Rekening "${bank}" sudah digunakan.`);
-      return;
-    }
-
+    const newName = bank.trim();
     const numericSaldo = Number(saldo.replace(/\./g, "")) || 0;
 
-    // 1. Update tabel rekening
-    await updateRekening(db, Number(id), bank.trim(), numericSaldo);
+    // ❗ CEK SALDO TIDAK BOLEH 0
+    if (numericSaldo === 0) {
+      Alert.alert("Peringatan", "Masukkan nominal dengan benar.");
+      return;
+    }
 
-    // 2. Update nama rekening di transaksi (FIX UTAMA)
-    await updateNamaRekeningDiTransaksi(db, oldName, bank.trim());
+    if (isCash && newName !== originalBankName) {
+      Alert.alert("Peringatan", "Rekening Uang Tunai tidak dapat diubah namanya.");
+      setBank(originalBankName);
+      return;
+    }
 
-    Alert.alert("Berhasil", "Rekening berhasil diperbarui.", [
-      { text: "OK", onPress: () => router.back() },
-    ]);
+    const exists = await isRekeningExists(db, newName);
+
+    if (exists && newName !== originalBankName) {
+      Alert.alert("Nama Sudah Ada", `Rekening "${newName}" sudah digunakan.`);
+      return;
+    }
+
+    try {
+      await updateRekening(db, Number(id), newName, numericSaldo);
+
+      if (newName !== originalBankName) {
+        await updateNamaRekeningDiTransaksi(db, originalBankName, newName);
+      }
+
+      await updateInitialBalanceTransaction(db, newName, numericSaldo);
+
+      setOriginalBankName(newName);
+
+      Alert.alert("Berhasil", "Rekening berhasil diperbarui.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      console.error("Gagal menyimpan edit rekening:", error);
+      Alert.alert("Error", "Gagal menyimpan perubahan.");
+    }
   };
 
-  // ==========================================
-  // DELETE REKENING
-  // ==========================================
   const handleDelete = () => {
-    Alert.alert("Hapus Rekening", "Yakin ingin menghapus rekening ini?", [
-      { text: "Batal", style: "cancel" },
-      {
-        text: "Hapus",
-        style: "destructive",
-        onPress: async () => {
-          const db = openDatabase();
-          await deleteRekening(db, Number(id));
-          Alert.alert("Berhasil", "Rekening dihapus.", [
-            { text: "OK", onPress: () => router.back() },
-          ]);
+    if (isCash) {
+      Alert.alert("Peringatan", "Rekening Uang Tunai tidak dapat dihapus.");
+      return;
+    }
+    if (!originalBankName) return;
+
+    Alert.alert(
+      "Hapus Rekening",
+      `Yakin ingin menghapus rekening "${originalBankName}"? Semua transaksi yang terkait akan dipindahkan ke "Uang Tunai" dan transaksi Saldo Awal akan dihapus.`,
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: async () => {
+            if (!db) return;
+
+            try {
+              await deleteInitialBalanceTransaction(db, originalBankName);
+
+              await db.runAsync(
+                `UPDATE transaksi SET rekening = 'Uang Tunai' WHERE rekening = ?`,
+                [originalBankName]
+              );
+
+              await deleteRekening(db, Number(id));
+
+              Alert.alert("Berhasil", "Rekening dihapus. Transaksi Saldo Awal dihapus.", [
+                { text: "OK", onPress: () => router.back() },
+              ]);
+            } catch (error) {
+              console.error("Gagal menghapus rekening:", error);
+              Alert.alert("Error", "Gagal menghapus rekening dan mengalihkan transaksi.");
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={konfirmasiKeluar} style={styles.backButton}>
           <Ionicons name="arrow-back" size={26} color="#fff" />
@@ -174,13 +189,11 @@ export default function EditRekening() {
         <Text style={styles.headerTitle}>Edit Rekening</Text>
       </View>
 
-      {/* CONTENT */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
         <View style={styles.content}>
-          {/* INPUT NAMA */}
           <TextInput
             style={[styles.input, isCash && { backgroundColor: "#dcdcdc" }]}
             placeholder="Nama Rekening"
@@ -195,7 +208,6 @@ export default function EditRekening() {
             }}
           />
 
-          {/* INPUT SALDO */}
           <TextInput
             style={styles.input}
             placeholder="Saldo Awal"
@@ -204,9 +216,12 @@ export default function EditRekening() {
             keyboardType="numeric"
           />
 
-          {/* BUTTONS */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <TouchableOpacity
+              style={[styles.deleteButton, isCash && { opacity: 0.5 }]}
+              onPress={handleDelete}
+              disabled={isCash}
+            >
               <Text style={styles.deleteText}>Hapus</Text>
             </TouchableOpacity>
 

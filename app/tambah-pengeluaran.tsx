@@ -3,7 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  FlatList,
+  BackHandler,
   Keyboard,
   Modal,
   Platform,
@@ -12,7 +12,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { getAllRekening, insertTransaction, openDatabase } from '../database/database';
@@ -54,9 +54,25 @@ export default function TambahPengeluaran() {
       setDb(database);
       const data = await getAllRekening(database) as RekeningRow[];
       setRekeningList(data);
-
     }
     loadDb();
+  }, []);
+
+  // ================= HARDWARE BACK BUTTON =================
+  useEffect(() => {
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      Alert.alert(
+        "Konfirmasi",
+        "Apakah kamu ingin meninggalkan halaman ini?",
+        [
+          { text: "Tidak", style: "cancel" },
+          { text: "Iya", onPress: () => navigation.goBack() }
+        ]
+      );
+      return true;
+    });
+
+    return () => handler.remove();
   }, []);
 
   // ================= PICKER =================
@@ -126,7 +142,7 @@ export default function TambahPengeluaran() {
     return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
-  // ================= KONFIRMASI KEMBALI =================
+  // ================= KONFIRMASI BACK =================
   const confirmBack = () => {
     Alert.alert(
       'Konfirmasi',
@@ -143,7 +159,7 @@ export default function TambahPengeluaran() {
     const angkaBersih = jumlah.replace(/\./g, '').trim();
 
     if (!angkaBersih || isNaN(Number(angkaBersih)) || Number(angkaBersih) <= 0) {
-      Alert.alert('Jumlah Tidak Valid', 'Masukkan nominal yang benar.');
+      Alert.alert('Jumlah Tidak Valid', 'Masukkan nominal dengan benar !!!');
       return;
     }
 
@@ -290,19 +306,17 @@ export default function TambahPengeluaran() {
           {dropdownVisible && (
             <View style={styles.dropdownList}>
               <ScrollView style={{ maxHeight: 200 }}>
-  {rekeningList.map((item) => (
-    <TouchableOpacity
-      key={item.id}
-      style={styles.dropdownItem}
-      onPress={() => pilihDariDropdown(item.bank)}
-    >
-      <Text style={styles.dropdownText}>{item.bank}</Text>
-    </TouchableOpacity>
-  ))}
-</ScrollView>
-
+                {rekeningList.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.dropdownItem}
+                    onPress={() => pilihDariDropdown(item.bank)}
+                  >
+                    <Text style={styles.dropdownText}>{item.bank}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-            
           )}
         </View>
 

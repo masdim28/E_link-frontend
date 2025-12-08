@@ -2,26 +2,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  BackHandler,
-  Keyboard,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    BackHandler,
+    Keyboard,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 import {
-  ensureCategoryColumn,
-  getAllTransactions,
-  getAllRekening,
-  openDatabase,
-} from '../database/database';
+    applyNewTransactionEffect,
+    ensureCategoryColumn,
+    getAllRekening,
+    getAllTransactions,
+    getOldTransactionDetails,
+    openDatabase,
+    reverseTransactionEffect,
+} from '../database/database'; // pastikan path benar
 
 type TransaksiRow = {
   id: number;
@@ -37,6 +40,25 @@ type RekeningRow = {
   bank: string;
   saldo: number;
 };
+
+const kategoriPengeluaran = [
+  "Makanan",
+  "Transportasi",
+  "Belanja",
+  "Tagihan",
+  "Hiburan",
+  "Kesehatan",
+  "Lainnya",
+];
+
+const kategoriPemasukan = [
+  "Gaji",
+  "Bonus",
+  "Saldo Awal",
+  "Penjualan",
+  "Investasi",
+  "Lainnya",
+];
 
 export default function EditTransaksi() {
   const router = useRouter();
@@ -57,21 +79,25 @@ export default function EditTransaksi() {
   const [jumlah, setJumlah] = useState<number | null>(null);
   const [kategoriDipilih, setKategoriDipilih] = useState('');
   const [kategoriBaru, setKategoriBaru] = useState('');
-  const [kategoriList, setKategoriList] = useState<string[]>([
-    'Gaji', 'Bonus', 'Penjualan', 'Investasi',
-  ]);
-
   const [modalVisible, setModalVisible] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [jenis, setJenis] = useState<'income' | 'expense'>('income');
 
   const [originalKategori, setOriginalKategori] = useState('');
+  const [isReadOnly, setIsReadOnly] = useState(false);
+
+  // kategori aktif
+  const kategoriList = jenis === 'income' ? kategoriPemasukan : kategoriPengeluaran;
+
+  // reset kategori ketika jenis berubah (agar tidak meninggalkan kategori invalid)
+  useEffect(() => {
+    setKategoriDipilih('');
+  }, [jenis]);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  // === TAMBAHAN: HANDLE BACK BUTTON ANDROID ===
   useEffect(() => {
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
       Alert.alert(
@@ -79,59 +105,108 @@ export default function EditTransaksi() {
         "Apakah kamu ingin meninggalkan halaman ini?",
         [
           { text: "Tidak", style: "cancel" },
-          {
-            text: "Iya",
-            onPress: () => router.back(),
-          },
+          { text: "Iya", onPress: () => router.back() }
         ]
       );
-      return true; // Mencegah back default
+      return true;
     });
 
     return () => handler.remove();
   }, []);
 
+  // ===========================
+  // LOAD DATA (defensive typing + mapping)
+  // ===========================
   const loadData = async () => {
     setLoading(true);
     try {
-      // Ambil daftar rekening dari DB
-      const rekeningData = (await getAllRekening(db)) as RekeningRow[];
-      // jika field tabel nama kolom berbeda, adjust di sini; asumsi: bank, saldo
-      setRekeningList(Array.isArray(rekeningData) ? rekeningData : []);
+      if (!db) {
+        console.error('Database object is null during loadData. Cannot fetch data.');
+        setLoading(false);
+        return;
+      }
 
-      // Ambil transaksi
-      const data = (await getAllTransactions(db)) as TransaksiRow[];
-      const trx = data.find((t) => String(t.id) === String(idValue));
+      // --- rekening ---
+      const rawRekening: unknown = await getAllRekening(db);
+      // pastikan array dan normalize field
+      let rekeningNormalized: RekeningRow[] = [];
+      if (Array.isArray(rawRekening)) {
+        rekeningNormalized = (rawRekening as any[]).map((r) => {
+          return {
+            id: typeof r?.id === 'number' ? r.id : Number(r?.id ?? 0),
+            bank: String(r?.bank ?? ''),
+            saldo: typeof r?.saldo === 'number' ? r.saldo : Number(r?.saldo ?? 0),
+          } as RekeningRow;
+        });
+      }
+      setRekeningList(rekeningNormalized);
+
+      // --- transaksi ---
+      const rawTransaksi: unknown = await getAllTransactions(db);
+      let transaksiList: TransaksiRow[] = [];
+      if (Array.isArray(rawTransaksi)) {
+        transaksiList = (rawTransaksi as any[]).map((t) => {
+          // keep all other dynamic properties
+          const base: TransaksiRow = {
+            id: typeof t?.id === 'number' ? t.id : Number(t?.id ?? 0),
+            tanggal: String(t?.tanggal ?? ''),
+            jam: String(t?.jam ?? ''),
+            rekening: String(t?.rekening ?? ''),
+            jenis: (t?.jenis === 'income' || t?.jenis === 'expense') ? t.jenis : 'income',
+          };
+          // copy other props
+          for (const k of Object.keys(t ?? {})) {
+            if (!['id','tanggal','jam','rekening','jenis'].includes(k)) {
+              (base as any)[k] = (t as any)[k];
+            }
+          }
+          return base;
+        });
+      }
+
+      // cari transaksi yg mau diedit
+      const trx = transaksiList.find((t) => String(t.id) === String(idValue));
 
       if (trx) {
         setRekeningDipilih(trx.rekening || null);
         setJenis(trx.jenis || 'income');
 
         if (trx.tanggal) {
-          const [y, m, d] = trx.tanggal.split('-').map(Number);
-          setTanggalObj(new Date(y, m - 1, d));
+          const parts = trx.tanggal.split('-').map(Number);
+          if (parts.length >= 3) {
+            const [y, m, d] = parts;
+            setTanggalObj(new Date(y, (m || 1) - 1, d || 1));
+          }
         }
 
         if (trx.jam) {
-          const [hh, mm] = trx.jam.split(':').map(Number);
-          const t = new Date();
-          t.setHours(hh);
-          t.setMinutes(mm);
-          setJamObj(t);
+          const [hhStr, mmStr] = String(trx.jam).split(':');
+          const hh = Number(hhStr || 0);
+          const mm = Number(mmStr || 0);
+          const d = new Date();
+          d.setHours(hh);
+          d.setMinutes(mm);
+          setJamObj(d);
         }
 
         const kategoriKeys = Object.keys(trx).filter(
           (k) => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
         );
-        const foundKategori = kategoriKeys.find((k) => Number(trx[k]) > 0);
+        const foundKategori = kategoriKeys.find((k) => Number((trx as any)[k]) > 0);
 
         if (foundKategori) {
           const kategoriFormatted = foundKategori.replace(/_/g, ' ');
           setKategoriDipilih(kategoriFormatted);
           setOriginalKategori(kategoriFormatted);
-          setJumlah(Number(trx[foundKategori]));
+          setJumlah(Number((trx as any)[foundKategori] ?? 0));
+
+          if (kategoriFormatted === 'Saldo Awal') {
+            setIsReadOnly(true);
+            Alert.alert("Perhatian", "Transaksi dengan kategori 'Saldo Awal' tidak dapat diedit. Anda hanya dapat melihat datanya.");
+          }
         }
       }
+
     } catch (e) {
       console.error('Gagal load edit data:', e);
     } finally {
@@ -139,6 +214,7 @@ export default function EditTransaksi() {
     }
   };
 
+  // rest of the functions (formatters, picker handlers, pilihRekening, pilihKategori...) remain same
   const formatTanggalIndonesia = (date: Date) => {
     const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const bulanList = [
@@ -154,28 +230,38 @@ export default function EditTransaksi() {
   };
 
   const showPickerHandler = (mode: 'date' | 'time') => {
+    if (isReadOnly) return;
     setPickerMode(mode);
     setShowPicker(true);
   };
 
   const pilihRekening = (item: string) => {
+    if (isReadOnly) return;
     setRekeningDipilih(item);
     setModalVisible(false);
   };
 
   const pilihDariDropdown = (item: string) => {
+    if (isReadOnly) return;
     setRekeningDipilih(item);
     setDropdownVisible(false);
   };
 
   const pilihKategori = (item: string) => {
+    if (isReadOnly) return;
     setKategoriDipilih(item);
   };
 
   const handleTambahKategori = () => {
+    if (isReadOnly) return;
     const nama = kategoriBaru.trim();
     if (nama !== '' && !kategoriList.includes(nama)) {
-      setKategoriList([...kategoriList, nama]);
+      // push ke array yang sesuai jenis (mutasi array dalam module scope)
+      if (jenis === 'income') {
+        kategoriPemasukan.push(nama);
+      } else {
+        kategoriPengeluaran.push(nama);
+      }
       setKategoriDipilih(nama);
       setKategoriBaru('');
       Keyboard.dismiss();
@@ -183,12 +269,37 @@ export default function EditTransaksi() {
   };
 
   const saveEdit = async () => {
+    if (isReadOnly) return;
+
+    if (!db) {
+      Alert.alert('Error Database', 'Koneksi database belum siap. Coba buka halaman ini lagi.');
+      console.error('Database object is null or undefined.');
+      return;
+    }
+
     if (!kategoriDipilih || jumlah === null) {
       Alert.alert('Peringatan', 'Lengkapi kategori dan jumlah terlebih dahulu.');
       return;
     }
 
+    if (jumlah === 0) {
+      Alert.alert('Peringatan', 'Nominal transaksi tidak boleh nol.');
+      return;
+    }
+
     try {
+      const oldTrx = await getOldTransactionDetails(db, Number(idValue));
+
+      if (oldTrx && oldTrx.rekening) {
+        await reverseTransactionEffect(
+          db,
+          oldTrx.rekening,
+          oldTrx.jenis,
+          oldTrx.jumlah,
+          oldTrx.kategori
+        );
+      }
+
       const cleanKategori = kategoriDipilih.replace(/\s+/g, '_');
       await ensureCategoryColumn(db, cleanKategori);
 
@@ -219,16 +330,32 @@ export default function EditTransaksi() {
         params
       );
 
-      Alert.alert('Sukses', 'Transaksi berhasil diperbarui.', [
+      await applyNewTransactionEffect(
+        db,
+        rekeningDipilih!,
+        jenis,
+        jumlah,
+        kategoriDipilih
+      );
+
+      Alert.alert('Sukses', 'Transaksi berhasil diperbarui dan saldo rekening telah disesuaikan.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (err) {
-      console.error('Gagal menyimpan edit:', err);
-      Alert.alert('Error', 'Gagal menyimpan perubahan.');
+      console.error('Gagal menyimpan edit dan memperbarui saldo:', err);
+      Alert.alert('Error', 'Gagal menyimpan perubahan. Cek log konsol.');
     }
   };
 
   const hapusTransaksi = () => {
+    if (isReadOnly) return;
+
+    if (!db) {
+      Alert.alert('Error Database', 'Koneksi database belum siap. Coba buka halaman ini lagi.');
+      console.error('Database object is null or undefined.');
+      return;
+    }
+
     Alert.alert(
       'Konfirmasi Hapus',
       'Apakah Anda yakin ingin menghapus transaksi ini?',
@@ -237,8 +364,21 @@ export default function EditTransaksi() {
         {
           text: 'Ya', style: 'destructive', onPress: async () => {
             try {
+              const oldTrx = await getOldTransactionDetails(db, Number(idValue));
+
+              if (oldTrx && oldTrx.rekening) {
+                await reverseTransactionEffect(
+                  db,
+                  oldTrx.rekening,
+                  oldTrx.jenis,
+                  oldTrx.jumlah,
+                  oldTrx.kategori
+                );
+              }
+
               await db.runAsync(`DELETE FROM transaksi WHERE id = ?`, [Number(idValue)]);
-              Alert.alert('Sukses', 'Transaksi berhasil dihapus.', [
+
+              Alert.alert('Sukses', 'Transaksi berhasil dihapus dan saldo rekening telah dikoreksi.', [
                 { text: 'OK', onPress: () => router.back() },
               ]);
             } catch (err) {
@@ -269,8 +409,9 @@ export default function EditTransaksi() {
               {rekeningList.map((item) => (
                 <TouchableOpacity
                   key={item.id}
-                  style={styles.rekeningButton}
-                  onPress={() => pilihRekening(item.bank)}
+                  style={[styles.rekeningButton, { opacity: isReadOnly ? 0.5 : 1 }]}
+                  onPress={isReadOnly ? () => {} : () => pilihRekening(item.bank)}
+                  disabled={isReadOnly}
                 >
                   <Text style={styles.rekeningText}>{item.bank}</Text>
                 </TouchableOpacity>
@@ -281,8 +422,6 @@ export default function EditTransaksi() {
       </Modal>
 
       <View style={styles.topHeader}>
-
-        {/* === TOMBOL BACK DENGAN POP UP === */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -306,30 +445,49 @@ export default function EditTransaksi() {
       </View>
 
       <ScrollView contentContainerStyle={styles.formContainer}>
-
+        {/* SWITCH JENIS TRANSAKSI */}
         <View style={styles.switchContainer}>
           <TouchableOpacity
-            style={[styles.switchBtn, jenis === 'expense' && styles.switchActive]}
-            onPress={() => setJenis('expense')}
+            style={[
+              styles.switchBtn,
+              jenis === 'expense' && styles.switchActive,
+              { opacity: isReadOnly ? 0.5 : 1 }
+            ]}
+            onPress={isReadOnly ? () => {} : () => setJenis('expense')}
+            disabled={isReadOnly}
           >
             <Text style={[styles.switchText, jenis === 'expense' && styles.switchTextActive]}>Pengeluaran</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.switchBtn, jenis === 'income' && styles.switchActive]}
-            onPress={() => setJenis('income')}
+            style={[
+              styles.switchBtn,
+              jenis === 'income' && styles.switchActive,
+              { opacity: isReadOnly ? 0.5 : 1 }
+            ]}
+            onPress={isReadOnly ? () => {} : () => setJenis('income')}
+            disabled={isReadOnly}
           >
             <Text style={[styles.switchText, jenis === 'income' && styles.switchTextActive]}>Pemasukan</Text>
           </TouchableOpacity>
         </View>
 
+        {/* DATE AND TIME PICKERS */}
         <View style={styles.row}>
-          <TouchableOpacity style={styles.dateButton} onPress={() => showPickerHandler('date')}>
+          <TouchableOpacity 
+            style={[styles.dateButton, { opacity: isReadOnly ? 0.5 : 1 }]}
+            onPress={isReadOnly ? () => {} : () => showPickerHandler('date')}
+            disabled={isReadOnly}
+          >
             <Text>{formatTanggalIndonesia(tanggalObj)}</Text>
             <Ionicons name="calendar-outline" size={20} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.timeButton} onPress={() => showPickerHandler('time')}>
+          <TouchableOpacity 
+            style={[styles.timeButton, { opacity: isReadOnly ? 0.5 : 1 }]}
+            onPress={isReadOnly ? () => {} : () => showPickerHandler('time')}
+            disabled={isReadOnly}
+          >
             <Text>{jamObj.getHours().toString().padStart(2,'0')}:{jamObj.getMinutes().toString().padStart(2,'0')}</Text>
           </TouchableOpacity>
         </View>
@@ -352,8 +510,13 @@ export default function EditTransaksi() {
           onCancel={() => { setShowPicker(false); setPickerMode(null); }}
         />
 
+        {/* DROPDOWN REKENING */}
         <View style={styles.dropdownContainer}>
-          <TouchableOpacity style={styles.dropdownButton} onPress={() => setDropdownVisible(!dropdownVisible)}>
+          <TouchableOpacity 
+            style={[styles.dropdownButton, { opacity: isReadOnly ? 0.5 : 1 }]}
+            onPress={isReadOnly ? () => {} : () => setDropdownVisible(!dropdownVisible)}
+            disabled={isReadOnly}
+          >
             <Text style={{ color: rekeningDipilih ? '#000' : '#999' }}>
               {rekeningDipilih || 'Pilih Rekening'}
             </Text>
@@ -362,9 +525,12 @@ export default function EditTransaksi() {
 
           {dropdownVisible && (
             <View style={styles.dropdownList}>
-              {/* GANTI FlatList DENGAN RENDER MAP SUPAYA TIDAK NESTED VIRTUALIZEDLIST */}
               {rekeningList.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.dropdownItem} onPress={() => pilihDariDropdown(item.bank)}>
+                <TouchableOpacity 
+                  key={item.id} 
+                  style={styles.dropdownItem} 
+                  onPress={isReadOnly ? () => {} : () => pilihDariDropdown(item.bank)}
+                >
                   <Text style={styles.dropdownText}>{item.bank}</Text>
                 </TouchableOpacity>
               ))}
@@ -372,51 +538,77 @@ export default function EditTransaksi() {
           )}
         </View>
 
+        {/* INPUT JUMLAH */}
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: isReadOnly ? '#e0e0e0' : '#EFEFEF' }]}
           placeholder="Jumlah"
           keyboardType="numeric"
           value={jumlah !== null ? formatRupiahEdit(jumlah.toString()) : ''}
-          onChangeText={(text) => {
+          onChangeText={isReadOnly ? () => {} : (text) => {
             const clean = text.replace(/\D/g, '');
             if (clean === '') setJumlah(null);
             else setJumlah(Number(clean));
           }}
+          editable={!isReadOnly}
         />
 
+        {/* INPUT KATEGORI DIPILIH */}
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: isReadOnly ? '#e0e0e0' : '#EFEFEF' }]}
           placeholder="Kategori yang Dipilih"
           value={kategoriDipilih}
-          onChangeText={setKategoriDipilih}
+          onChangeText={isReadOnly ? () => {} : setKategoriDipilih}
+          editable={!isReadOnly}
         />
 
+        {/* BUTTON KATEGORI LIST */}
         <View style={styles.kategoriContainer}>
           {kategoriList.map((item) => (
-            <TouchableOpacity key={item} style={styles.kategoriButton} onPress={() => pilihKategori(item)}>
+            <TouchableOpacity 
+              key={item} 
+              style={[styles.kategoriButton, { opacity: isReadOnly ? 0.5 : 1 }]}
+              onPress={isReadOnly ? () => {} : () => pilihKategori(item)}
+              disabled={isReadOnly}
+            >
               <Text style={styles.kategoriText}>{item}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
+        {/* INPUT TAMBAH KATEGORI BARU */}
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: isReadOnly ? '#e0e0e0' : '#EFEFEF' }]}
           placeholder="Tambah Kategori Baru"
           value={kategoriBaru}
-          onChangeText={setKategoriBaru}
-          onSubmitEditing={handleTambahKategori}
+          onChangeText={isReadOnly ? () => {} : setKategoriBaru}
+          onSubmitEditing={isReadOnly ? () => {} : handleTambahKategori}
+          editable={!isReadOnly}
         />
 
+        {/* TOMBOL SIMPAN DAN HAPUS */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
-          <TouchableOpacity style={[styles.simpanButton, { backgroundColor: '#E53935' }]} onPress={hapusTransaksi}>
+          <TouchableOpacity
+            style={[
+              styles.simpanButton,
+              { backgroundColor: isReadOnly ? '#ccc' : '#E53935' }
+            ]}
+            onPress={isReadOnly ? () => {} : hapusTransaksi}
+            disabled={isReadOnly}
+          >
             <Text style={styles.simpanText}>Hapus</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.simpanButton} onPress={saveEdit}>
+          <TouchableOpacity
+            style={[
+              styles.simpanButton,
+              { backgroundColor: isReadOnly ? '#ccc' : '#00A86B' }
+            ]}
+            onPress={isReadOnly ? () => {} : saveEdit}
+            disabled={isReadOnly}
+          >
             <Text style={styles.simpanText}>Simpan</Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
     </View>
   );
@@ -481,6 +673,6 @@ const styles = StyleSheet.create({
   kategoriButton: { backgroundColor: '#00A86B', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
   kategoriText: { color: '#fff' },
 
-  simpanButton: { backgroundColor: '#00A86B', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8 },
+  simpanButton: { paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8 },
   simpanText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

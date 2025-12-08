@@ -3,7 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  FlatList,
+  BackHandler,
   Keyboard,
   Modal,
   Platform,
@@ -12,7 +12,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { getAllRekening, insertTransaction, openDatabase } from '../database/database';
@@ -54,12 +54,30 @@ export default function TambahPemasukan() {
 
       const data = await getAllRekening(database) as RekeningRow[];
 
-      // Tambahkan Uang Tunai sebagai pilihan tetap di awal
       setRekeningList(data);
-
     }
 
     loadDb();
+  }, []);
+
+  // ================ HANDLE BACK BUTTON (ANDROID) ================
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      Alert.alert(
+        "Konfirmasi",
+        "Apakah kamu ingin meninggalkan halaman ini?",
+        [
+          { text: "Tidak", style: "cancel" },
+          {
+            text: "Iya",
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+      return true;
+    });
+
+    return () => backHandler.remove();
   }, []);
 
   // ================= PICKER =================
@@ -115,11 +133,7 @@ export default function TambahPemasukan() {
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
     ];
-    const hari = hariList[date.getDay()];
-    const tgl = date.getDate();
-    const bulan = bulanList[date.getMonth()];
-    const tahun = date.getFullYear();
-    return `${hari}, ${tgl} ${bulan} ${tahun}`;
+    return `${hariList[date.getDay()]}, ${date.getDate()} ${bulanList[date.getMonth()]} ${date.getFullYear()}`;
   };
 
   // ================= FORMAT RUPIAH =================
@@ -146,7 +160,7 @@ export default function TambahPemasukan() {
     const angkaBersih = jumlah.replace(/\./g, '').trim();
 
     if (!angkaBersih || isNaN(Number(angkaBersih)) || Number(angkaBersih) <= 0) {
-      Alert.alert('Jumlah Tidak Valid', 'Masukkan nominal yang benar.');
+      Alert.alert('Jumlah Tidak Valid', 'Masukkan nominal dengan benar !!!');
       return;
     }
 
@@ -198,7 +212,6 @@ export default function TambahPemasukan() {
                   return;
                 }
                 setRekeningDipilih(rekeningBaru.trim());
-                // Tambahkan ke daftar rekening agar dropdown update
                 setRekeningList(prev => [...prev, { id: prev.length + 1, bank: rekeningBaru.trim(), saldo: 0 }]);
                 setRekeningBaru('');
                 setModalRekeningBaru(false);
@@ -240,6 +253,7 @@ export default function TambahPemasukan() {
       </View>
 
       <ScrollView contentContainerStyle={styles.formContainer}>
+        
         {/* Tanggal & Jam */}
         <View style={styles.row}>
           <TouchableOpacity style={styles.dateButton} onPress={() => showPickerHandler('date')}>
@@ -294,18 +308,17 @@ export default function TambahPemasukan() {
 
           {dropdownVisible && (
             <View style={styles.dropdownList}>
-            <ScrollView style={{ maxHeight: 200 }}>
-  {rekeningList.map((item) => (
-    <TouchableOpacity
-      key={item.id}
-      style={styles.dropdownItem}
-      onPress={() => pilihDariDropdown(item.bank)}
-    >
-      <Text style={styles.dropdownText}>{item.bank}</Text>
-    </TouchableOpacity>
-  ))}
-</ScrollView>
-
+              <ScrollView style={{ maxHeight: 200 }}>
+                {rekeningList.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.dropdownItem}
+                    onPress={() => pilihDariDropdown(item.bank)}
+                  >
+                    <Text style={styles.dropdownText}>{item.bank}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           )}
         </View>

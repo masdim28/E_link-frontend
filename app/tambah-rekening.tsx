@@ -1,22 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import {
-  openDatabase,
-  insertRekening,
   insertPemasukan,
+  insertRekening,
   isRekeningExists,
+  openDatabase,
 } from "../database/database";
 
 export default function TambahRekening() {
@@ -26,29 +27,49 @@ export default function TambahRekening() {
 
   // ========= FORMAT SALDO DENGAN TITIK =========
   const handleSaldoChange = (text: string) => {
-    // Hanya boleh angka
     const numeric = text.replace(/[^0-9]/g, "");
-
-    // Format titik ribuan
     const formatted = numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-
     setSaldoAwal(formatted);
   };
+
+  // ================= HARDWARE BACK BUTTON =================
+  useEffect(() => {
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      Alert.alert(
+        "Konfirmasi",
+        "Apakah kamu ingin meninggalkan halaman ini?",
+        [
+          { text: "Tidak", style: "cancel" },
+          { text: "Iya", onPress: () => router.back() },
+        ]
+      );
+      return true;
+    });
+
+    return () => handler.remove();
+  }, []);
 
   // ================ SAVE ====================
   const handleSave = async () => {
     const cleanBank = bank.trim();
     const jumlah = parseFloat(saldoAwal.replace(/[^0-9]/g, ""));
 
+    // ❗ CEK INPUT KOSONG
     if (!cleanBank || isNaN(jumlah)) {
       Alert.alert("Input salah", "Isi nama rekening dan saldo awal dengan benar.");
+      return;
+    }
+
+    // ❗ CEK SALDO TIDAK BOLEH 0
+    if (jumlah === 0) {
+      Alert.alert("Peringatan", "Masukkan nominal dengan benar.");
       return;
     }
 
     try {
       const db = openDatabase();
 
-      // 🔥 CEK NAMA REKENING SUDAH ADA
+      // ❗ CEK NAMA REKENING SUDAH ADA
       const exists = await isRekeningExists(db, cleanBank);
 
       if (exists) {
@@ -80,10 +101,22 @@ export default function TambahRekening() {
     }
   };
 
+  // ================= KONFIRMASI BACK BUTTON DI HEADER =================
+  const confirmBack = () => {
+    Alert.alert(
+      "Konfirmasi",
+      "Apakah kamu ingin meninggalkan halaman ini?",
+      [
+        { text: "Tidak", style: "cancel" },
+        { text: "Iya", onPress: () => router.back() },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={confirmBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </TouchableOpacity>
 
