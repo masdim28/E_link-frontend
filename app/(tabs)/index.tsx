@@ -1,17 +1,19 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-
 import {
   ActivityIndicator,
   Animated,
   FlatList,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { getAllTransactions, openDatabase } from '../../database/database';
 
 type Transaction = {
@@ -20,8 +22,8 @@ type Transaction = {
   tanggal: string;
   jam: string;
   rekening: string;
-  kategori?: string; // kategori yang dipilih user
-  jumlah?: number;  // jumlah yang sesuai
+  kategori?: string;
+  jumlah?: number;
   [key: string]: any;
 };
 
@@ -36,6 +38,9 @@ export default function TransaksiScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+
+  // ==== NEW: DatePicker visibility ====
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const changeDate = (days: number) => {
     const d = new Date(selectedDate);
@@ -62,32 +67,30 @@ export default function TransaksiScreen() {
 
   const fetchTransactions = async () => {
     setLoading(true);
-   const data = (await getAllTransactions(db)) as any as Transaction[];
+    const data = (await getAllTransactions(db)) as any as Transaction[];
 
     const normalize = (t: string) =>
-  new Date(t).toISOString().split("T")[0];
+      new Date(t).toISOString().split('T')[0];
 
-const filtered = data.filter(
-  item => normalize(item.tanggal) === selectedDate
-);
+    const filtered = data.filter(
+      item => normalize(item.tanggal) === selectedDate
+    );
 
-
-    // Ambil kategori yang nilainya > 0
     const mapped = filtered.map(item => {
       const kategoriKeys = Object.keys(item).filter(
-  k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
-);
+        k => !['id', 'tanggal', 'jam', 'rekening', 'jenis'].includes(k)
+      );
 
-let foundKategori = '';
-let jumlah = 0;
+      let foundKategori = '';
+      let jumlah = 0;
 
-for (const key of kategoriKeys) {
-  if (item[key] != null && Number(item[key]) > 0) {
-    foundKategori = key;
-    jumlah = Number(item[key]);
-    break;
-  }
-}
+      for (const key of kategoriKeys) {
+        if (item[key] != null && Number(item[key]) > 0) {
+          foundKategori = key;
+          jumlah = Number(item[key]);
+          break;
+        }
+      }
 
       return { ...item, kategori: foundKategori.replace(/_/g, ' '), jumlah };
     });
@@ -97,11 +100,10 @@ for (const key of kategoriKeys) {
   };
 
   useFocusEffect(
-  React.useCallback(() => {
-    fetchTransactions();
-  }, [selectedDate])
-);
-
+    React.useCallback(() => {
+      fetchTransactions();
+    }, [selectedDate])
+  );
 
   useEffect(() => {
     fetchTransactions();
@@ -175,25 +177,24 @@ for (const key of kategoriKeys) {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
+
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+
           <TouchableOpacity onPress={() => changeDate(-1)}>
             <Ionicons name="chevron-back" size={24} color="#fff" />
           </TouchableOpacity>
 
-          <Text style={[styles.headerTitle, { marginHorizontal: 10 }]}>
-            {new Date(selectedDate).toLocaleDateString('id-ID', {
-              weekday: 'short',
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </Text>
+          {/* ==== NEW: TANGGAL BISA DITEKAN ==== */}
+          <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+            <Text style={[styles.headerTitle, { marginHorizontal: 10 }]}>
+              {new Date(selectedDate).toLocaleDateString('id-ID', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity onPress={() => changeDate(1)}>
             <Ionicons name="chevron-forward" size={24} color="#fff" />
@@ -231,6 +232,21 @@ for (const key of kategoriKeys) {
         </View>
       </View>
 
+      {/* ==== DATE PICKER ==== */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={new Date(selectedDate)}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+          onChange={(event, date) => {
+            setShowDatePicker(false);
+            if (date) {
+              setSelectedDate(date.toISOString().split('T')[0]);
+            }
+          }}
+        />
+      )}
+
       <FlatList
         data={transactions}
         renderItem={renderItem}
@@ -239,18 +255,13 @@ for (const key of kategoriKeys) {
         refreshing={loading}
         onRefresh={fetchTransactions}
         ListEmptyComponent={() => (
-          <Text
-            style={{
-              textAlign: 'center',
-              marginTop: 30,
-              color: '#777',
-            }}
-          >
+          <Text style={{ textAlign: 'center', marginTop: 30, color: '#777' }}>
             Tidak ada transaksi pada tanggal ini.
           </Text>
         )}
       />
 
+      {/* FAB & OPTIONS */}
       {showOptions && (
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={toggleOptions} />
@@ -306,21 +317,53 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  headerTitle: { color: '#fff', fontSize: 20, textAlign: 'center', fontWeight: '600', marginBottom: 16 },
-  summaryContainer: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, padding: 10, justifyContent: 'space-between' },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 10,
+    justifyContent: 'space-between',
+  },
   summaryBox: { alignItems: 'center', flex: 1 },
   summaryTitle: { fontWeight: '600', color: '#000' },
   summaryAmount: { fontWeight: 'bold', marginTop: 4 },
   listContent: { paddingHorizontal: 16, paddingTop: 20 },
-  item: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 0.6, borderColor: '#E5E5E5' },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 0.6,
+    borderColor: '#E5E5E5',
+  },
   itemTitle: { fontSize: 16, fontWeight: 'bold' },
   itemCategory: { fontSize: 12, color: '#555' },
   itemAmount: { minWidth: 90, textAlign: 'right', fontSize: 16, fontWeight: '600' },
   fabContainer: { position: 'absolute', bottom: 25, right: 25, alignItems: 'center' },
-  addButton: { backgroundColor: '#00A86B', width: 55, height: 55, borderRadius: 30, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  addButton: {
+    backgroundColor: '#00A86B',
+    width: 55,
+    height: 55,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
   optionContainer: { alignItems: 'flex-end', marginBottom: 10, gap: 12 },
   optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
-  optionLabel: { backgroundColor: '#f2f2f2', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, marginRight: 8 },
+  optionLabel: {
+    backgroundColor: '#f2f2f2',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginRight: 8,
+  },
   optionLabelText: { color: '#000', fontSize: 14, fontWeight: '500' },
   optionIcon: { width: 45, height: 45, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
